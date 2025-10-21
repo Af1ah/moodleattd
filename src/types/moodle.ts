@@ -40,16 +40,25 @@ export interface RetrieveReportResponse {
 
 // Attendance Processing Types
 
+export interface SessionInfo {
+  sessionId: string; // unique identifier: date_time_course
+  date: string;
+  time: string;
+  sessionName: string; // course name
+  timestamp: number;
+}
+
 export interface SessionDate {
   date: string;
   timestamp: number;
+  sessions: SessionInfo[]; // multiple sessions per day
 }
 
 export interface StudentAttendance {
   studentName: string;
   courseName: string;
   sessions: {
-    [sessionDate: string]: AttendanceStatus;
+    [sessionId: string]: AttendanceStatus; // keyed by sessionId
   };
   totalPresent: number;
   totalAbsent: number;

@@ -1,114 +1,100 @@
-import { 
-  RetrieveReportResponse, 
-  AttendanceTableData, 
-  StudentAttendance, 
+import {
+  RetrieveReportResponse,
+  AttendanceTableData,
+  StudentAttendance,
   AttendanceStatus,
-  SessionDate 
+  SessionDate,
+  SessionInfo
 } from '@/types/moodle';
 
-/**
- * Parse attendance status from various possible values
- */
 export function parseAttendanceStatus(value: string | number | null): AttendanceStatus {
   if (!value) return '-';
-  
   const statusStr = String(value).toUpperCase().trim();
-  
-  // Handle common patterns
   if (statusStr === 'P' || statusStr === 'PRESENT') return 'P';
   if (statusStr === 'A' || statusStr === 'ABSENT') return 'A';
   if (statusStr === 'L' || statusStr === 'LATE') return 'L';
   if (statusStr === 'E' || statusStr === 'EXCUSED') return 'E';
-  
   return '-';
 }
 
+function extractTime(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '00:00';
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  } catch {
+    return '00:00';
+  }
+}
 
+function extractDate(dateStr: string): string {
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toISOString().split('T')[0];
+  } catch {
+    return dateStr;
+  }
+}
 
-/**
- * Transform Moodle report data into structured attendance table
- * Handles the report builder format with columns array
- * Data structure:
- * - Column 0: Course full name
- * - Column 1: Full name (Student)
- * - Column 2: Session date
- * - Column 3: User session status (P/A/L/E)
- * - Column 4: User session grade (2.00=P, 1.00=L/E, 0.00=A)
- * - Column 5: Status P - Total count
- * - Column 6: Status L - Total count
- * - Column 7: Status E - Total count
- * - Column 8: Status A - Total count
- */
-export function transformReportToAttendance(
-  reportData: RetrieveReportResponse
-): AttendanceTableData {
+export function transformReportToAttendance(reportData: RetrieveReportResponse): AttendanceTableData {
   const { rows } = reportData.data;
-  
   if (!rows || rows.length === 0) {
     return { students: [], sessionDates: [] };
   }
-
-  // Fixed indices based on actual API response
-  const courseIndex = 0;      // "Course full name"
-  const nameIndex = 1;         // "Full name" 
-  const dateIndex = 2;         // "Session date"
-  const statusIndex = 3;       // "User session status"
-  const gradeIndex = 4;        // "User session grade"
-  const totalPIndex = 5;       // "Status P - Total count"
-  const totalLIndex = 6;       // "Status L - Total count"
-  const totalEIndex = 7;       // "Status E - Total count"
-  const totalAIndex = 8;       // "Status A - Total count"
-
-  // Collect all unique sessions and students
-  const sessionsSet = new Set<string>();
+  const courseIndex = 0;
+  const nameIndex = 1;
+  const dateIndex = 2;
+  const statusIndex = 3;
+  const gradeIndex = 4;
+  const totalPIndex = 5;
+  const totalLIndex = 6;
+  const totalEIndex = 7;
+  const totalAIndex = 8;
+  const sessionsMap = new Map<string, SessionInfo>();
   const studentsMap = new Map<string, StudentAttendance>();
-  
   rows.forEach((row) => {
-    // Handle both formats: row.columns array or direct row object
     const columns = Array.isArray(row.columns) ? row.columns : Object.values(row);
-    
     const courseName = String(columns[courseIndex] || 'Unknown Course');
     const studentName = String(columns[nameIndex] || 'Unknown Student');
-    const sessionDate = String(columns[dateIndex] || '');
+    const sessionDateTime = String(columns[dateIndex] || '');
     const statusValue = columns[statusIndex] as string | number | null;
     const gradeValue = columns[gradeIndex];
-    
-    // Parse status - use the status column directly (it already has P/A/L/E)
     let status: AttendanceStatus = parseAttendanceStatus(statusValue);
-    
-    // Fallback: if status is not clear, derive from grade
-    // 2.00 or "2" = P (Present)
-    // 1.00 or "1" = L or E (Late or Excused)
-    // 0.00 or "0" = A (Absent)
     if (status === '-' && gradeValue !== null) {
       const grade = parseFloat(String(gradeValue));
       if (grade >= 2) {
         status = 'P';
       } else if (grade >= 1) {
-        status = 'L'; // Default to L, but could be E
+        status = 'L';
       } else {
         status = 'A';
       }
     }
-    
-    // Extract totals from the columns
+    const dateOnly = extractDate(sessionDateTime);
+    const timeOnly = extractTime(sessionDateTime);
+    const timestamp = new Date(sessionDateTime).getTime() || Date.now();
+    const sessionId = `${dateOnly}_${timeOnly}_${courseName}`;
+    if (!sessionsMap.has(sessionId)) {
+      sessionsMap.set(sessionId, {
+        sessionId,
+        date: dateOnly,
+        time: timeOnly,
+        sessionName: courseName,
+        timestamp,
+      });
+    }
     const totalP = parseInt(String(columns[totalPIndex] || '0')) || 0;
     const totalL = parseInt(String(columns[totalLIndex] || '0')) || 0;
     const totalE = parseInt(String(columns[totalEIndex] || '0')) || 0;
     const totalA = parseInt(String(columns[totalAIndex] || '0')) || 0;
-    
-    const studentKey = `${studentName}_${courseName}`;
-    
-    // Add session to set
-    if (sessionDate) {
-      sessionsSet.add(sessionDate);
-    }
-    
-    // Initialize or update student record
+    const studentKey = `${studentName}`;
     if (!studentsMap.has(studentKey)) {
       studentsMap.set(studentKey, {
         studentName,
-        courseName,
+        courseName: '',
         sessions: {},
         totalPresent: 0,
         totalAbsent: 0,
@@ -117,91 +103,87 @@ export function transformReportToAttendance(
         totalSessions: 0,
       });
     }
-    
     const student = studentsMap.get(studentKey)!;
-    
-    // Update totals to the maximum value seen (since each row may have the cumulative total)
     student.totalPresent = Math.max(student.totalPresent, totalP);
     student.totalLate = Math.max(student.totalLate, totalL);
     student.totalExcused = Math.max(student.totalExcused, totalE);
     student.totalAbsent = Math.max(student.totalAbsent, totalA);
-    
-    // Record session attendance
-    if (sessionDate && status !== '-') {
-      student.sessions[sessionDate] = status;
+    if (sessionId && status !== '-') {
+      student.sessions[sessionId] = status;
     }
   });
-  
-  // Calculate total sessions for each student
   studentsMap.forEach((student) => {
     student.totalSessions = student.totalPresent + student.totalAbsent + student.totalLate + student.totalExcused;
   });
-  
-  // Convert sessions to sorted array
-  const sessionDates: SessionDate[] = Array.from(sessionsSet)
-    .map(date => ({
+  const allSessions = Array.from(sessionsMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+  const dateMap = new Map<string, SessionInfo[]>();
+  allSessions.forEach(session => {
+    if (!dateMap.has(session.date)) {
+      dateMap.set(session.date, []);
+    }
+    dateMap.get(session.date)!.push(session);
+  });
+  const sessionDates: SessionDate[] = Array.from(dateMap.entries())
+    .map(([date, sessions]) => ({
       date,
-      timestamp: new Date(date).getTime() || Date.now(),
+      timestamp: sessions[0].timestamp,
+      sessions: sessions.sort((a, b) => a.time.localeCompare(b.time)),
     }))
     .sort((a, b) => a.timestamp - b.timestamp);
-  
   return {
     students: Array.from(studentsMap.values()),
     sessionDates,
   };
 }
 
-/**
- * Export attendance data to CSV format
- */
 export function exportToCSV(data: AttendanceTableData): string {
   const { students, sessionDates } = data;
-  
-  // Build CSV headers
+  const sessionHeaders: string[] = [];
+  sessionDates.forEach(dateGroup => {
+    dateGroup.sessions.forEach(session => {
+      sessionHeaders.push(`${session.date} ${session.time} - ${session.sessionName}`);
+    });
+  });
   const headers = [
     'Student Name',
-    'Course Name',
-    ...sessionDates.map(s => s.date),
+    ...sessionHeaders,
     'Total Present',
     'Total Absent',
     'Total Late',
     'Total Excused',
     'Total Sessions',
   ];
-  
-  // Build CSV rows
-  const rows = students.map(student => [
-    student.studentName,
-    student.courseName,
-    ...sessionDates.map(s => student.sessions[s.date] || '-'),
-    student.totalPresent,
-    student.totalAbsent,
-    student.totalLate,
-    student.totalExcused,
-    student.totalSessions,
-  ]);
-  
-  // Combine into CSV string
+  const rows = students.map(student => {
+    const sessionValues: string[] = [];
+    sessionDates.forEach(dateGroup => {
+      dateGroup.sessions.forEach(session => {
+        sessionValues.push(student.sessions[session.sessionId] || '-');
+      });
+    });
+    return [
+      student.studentName,
+      ...sessionValues,
+      student.totalPresent,
+      student.totalAbsent,
+      student.totalLate,
+      student.totalExcused,
+      student.totalSessions,
+    ];
+  });
   const csvContent = [
     headers.join(','),
     ...rows.map(row => row.join(',')),
   ].join('\n');
-  
   return csvContent;
 }
 
-/**
- * Download CSV file
- */
 export function downloadCSV(csvContent: string, filename: string = 'attendance_report.csv'): void {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
-  
   link.setAttribute('href', url);
   link.setAttribute('download', filename);
   link.style.visibility = 'hidden';
-  
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
