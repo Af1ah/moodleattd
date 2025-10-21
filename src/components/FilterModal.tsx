@@ -57,7 +57,7 @@ export default function FilterModal({
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out"
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-300 ease-out"
         onClick={onClose}
         style={{ animation: 'fadeIn 0.3s ease-out' }}
       />
@@ -68,32 +68,32 @@ export default function FilterModal({
         style={{ animation: 'slideUp 0.3s ease-out' }}
       >
         <div 
-          className="bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl sm:mx-4 max-h-[85vh] sm:max-h-[80vh] flex flex-col"
+          className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-2xl sm:mx-4 max-h-[85vh] sm:max-h-[80vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
-          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                <h3 className="text-lg font-bold text-gray-900">
                   Filter Courses
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-gray-600">
                   {selectedCourses.size} of {allCourses.length} selected
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors active:scale-95 transform"
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors active:scale-95 transform"
               aria-label="Close"
             >
-              <svg className="w-6 h-6 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -104,7 +104,7 @@ export default function FilterModal({
             {/* Select All Button */}
             <button
               onClick={onToggleAll}
-              className="w-full mb-4 px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors active:scale-98 transform"
+              className="w-full mb-4 px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg text-sm font-medium text-gray-800 transition-colors active:scale-98 transform"
             >
               {selectedCourses.size === allCourses.length ? '✓ Unselect All' : 'Select All'}
             </button>
@@ -114,7 +114,7 @@ export default function FilterModal({
               {allCourses.map(course => (
                 <label
                   key={course}
-                  className="flex items-center gap-3 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors active:scale-98 transform border border-transparent hover:border-gray-200 dark:hover:border-gray-600"
+                  className="flex items-center gap-3 p-4 rounded-xl hover:bg-blue-50 cursor-pointer transition-colors active:scale-98 transform border border-transparent hover:border-blue-200"
                 >
                   <input
                     type="checkbox"
@@ -122,11 +122,11 @@ export default function FilterModal({
                     onChange={() => onToggleCourse(course)}
                     className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                   />
-                  <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span className="flex-1 text-sm font-medium text-gray-800">
                     {course}
                   </span>
                   <span
-                    className={`w-4 h-4 rounded ${courseColorMap.get(course)} ring-2 ring-white dark:ring-gray-800`}
+                    className={`w-4 h-4 rounded ${courseColorMap.get(course)} ring-2 ring-white`}
                   />
                 </label>
               ))}
@@ -134,7 +134,7 @@ export default function FilterModal({
           </div>
 
           {/* Modal Footer */}
-          <div className="p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+          <div className="p-4 sm:p-6 border-t border-gray-200 bg-gray-50">
             <button
               onClick={onClose}
               className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium rounded-lg transition-colors shadow-md hover:shadow-lg active:scale-98 transform"

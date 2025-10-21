@@ -9,11 +9,11 @@ interface AttendanceTableProps {
 }
 
 const statusColors: Record<AttendanceStatus, string> = {
-  'P': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-  'A': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-  'L': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-  'E': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  '-': 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  'P': 'bg-green-100 text-green-800',
+  'A': 'bg-red-100 text-red-800',
+  'L': 'bg-yellow-100 text-yellow-800',
+  'E': 'bg-blue-100 text-blue-800',
+  '-': 'bg-gray-100 text-gray-600',
 };
 
 const statusLabels: Record<AttendanceStatus, string> = {
@@ -26,12 +26,12 @@ const statusLabels: Record<AttendanceStatus, string> = {
 
 // Colors for different courses
 const courseColors = [
-  'bg-blue-50 dark:bg-blue-950',
-  'bg-green-50 dark:bg-green-950',
-  'bg-purple-50 dark:bg-purple-950',
-  'bg-orange-50 dark:bg-orange-950',
-  'bg-pink-50 dark:bg-pink-950',
-  'bg-indigo-50 dark:bg-indigo-950',
+  'bg-blue-50',
+  'bg-green-50',
+  'bg-purple-50',
+  'bg-orange-50',
+  'bg-pink-50',
+  'bg-indigo-50',
 ];
 
 export default function AttendanceTable({ data }: AttendanceTableProps) {
@@ -107,7 +107,7 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
   return (
     <div className="space-y-4">
       {/* Filter Button */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+      <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
         <button
           onClick={() => setShowFilters(true)}
           className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-md hover:shadow-lg active:scale-98 transform"
@@ -136,14 +136,14 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
       />
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-800">
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             {/* Date Row */}
             <tr>
               <th 
                 rowSpan={2}
-                className="sticky left-0 z-20 px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50 dark:bg-gray-800 border-r border-gray-300 dark:border-gray-600"
+                className="sticky left-0 z-20 px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-50 border-r border-gray-300"
               >
                 Student Name
               </th>
@@ -151,7 +151,7 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
                 <th
                   key={dateIndex}
                   colSpan={dateGroup.sessions.length}
-                  className="px-3 py-2 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-300 dark:border-gray-600"
+                  className="px-3 py-2 text-center text-xs font-bold text-gray-800 uppercase tracking-wider border-r border-gray-300"
                 >
                   {new Date(dateGroup.date).toLocaleDateString('en-US', {
                     weekday: 'short',
@@ -162,31 +162,31 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
               ))}
               <th
                 rowSpan={2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-100 dark:bg-gray-700"
+                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
               >
                 Total P
               </th>
               <th
                 rowSpan={2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-100 dark:bg-gray-700"
+                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
               >
                 Total A
               </th>
               <th
                 rowSpan={2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-100 dark:bg-gray-700"
+                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
               >
                 Total L
               </th>
               <th
                 rowSpan={2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-100 dark:bg-gray-700"
+                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
               >
                 Total E
               </th>
               <th
                 rowSpan={2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-100 dark:bg-gray-700"
+                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
               >
                 Total
               </th>
@@ -197,7 +197,7 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
                 dateGroup.sessions.map((session, sessionIndex) => (
                   <th
                     key={`${dateIndex}-${sessionIndex}`}
-                    className={`px-2 py-2 text-center text-xs font-medium text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 ${
+                    className={`px-2 py-2 text-center text-xs font-medium text-gray-700 border-r border-gray-200 ${
                       courseColorMap.get(session.sessionName)
                     }`}
                   >
@@ -212,11 +212,11 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
               )}
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+          <tbody className="bg-white divide-y divide-gray-200">
             {students.map((student, studentIndex) => {
               return (
-                <tr key={studentIndex} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="sticky left-0 z-10 px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-900 border-r border-gray-300 dark:border-gray-600">
+                <tr key={studentIndex} className="hover:bg-blue-50">
+                  <td className="sticky left-0 z-10 px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-white border-r border-gray-300">
                     {student.studentName}
                   </td>
                   {filteredSessionDates.map((dateGroup, dateIndex) => {
@@ -225,7 +225,7 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
                       return (
                         <td
                           key={`${dateIndex}-${sessionIndex}`}
-                          className={`px-2 py-4 whitespace-nowrap text-center border-r border-gray-200 dark:border-gray-700 ${
+                          className={`px-2 py-4 whitespace-nowrap text-center border-r border-gray-200 ${
                             courseColorMap.get(session.sessionName)
                           }`}
                         >
@@ -239,19 +239,19 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
                       );
                     });
                   })}
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-medium text-green-600 dark:text-green-400 bg-gray-50 dark:bg-gray-800">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-medium text-green-600 bg-blue-50">
                     {student.totalPresent}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-medium text-red-600 dark:text-red-400 bg-gray-50 dark:bg-gray-800">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-medium text-red-600 bg-blue-50">
                     {student.totalAbsent}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-medium text-yellow-600 dark:text-yellow-400 bg-gray-50 dark:bg-gray-800">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-medium text-yellow-600 bg-blue-50">
                     {student.totalLate}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-medium text-blue-600 dark:text-blue-400 bg-gray-50 dark:bg-gray-800">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-medium text-blue-600 bg-blue-50">
                     {student.totalExcused}
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-bold text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-800">
+                  <td className="px-4 py-4 whitespace-nowrap text-sm text-center font-bold text-gray-900 bg-blue-50">
                     {student.totalSessions}
                   </td>
                 </tr>
@@ -261,15 +261,15 @@ export default function AttendanceTable({ data }: AttendanceTableProps) {
         </table>
         
         {/* Legend */}
-        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
           <div className="flex flex-wrap gap-4 text-xs">
-            <span className="text-gray-600 dark:text-gray-400 font-medium">Legend:</span>
+            <span className="text-gray-700 font-medium">Legend:</span>
             {Object.entries(statusLabels).map(([status, label]) => (
               <div key={status} className="flex items-center gap-2">
                 <span className={`px-2 py-1 rounded font-semibold ${statusColors[status as AttendanceStatus]}`}>
                   {status}
                 </span>
-                <span className="text-gray-600 dark:text-gray-400">{label}</span>
+                <span className="text-gray-700">{label}</span>
               </div>
             ))}
           </div>
