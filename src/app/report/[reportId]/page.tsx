@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import MoodleAPIService from '@/services/moodleAPI';
-import { AttendanceTableData } from '@/types/moodle';
+import { AttendanceTableData, MoodleSettings, RetrieveReportResponse } from '@/types/moodle';
 import { 
   transformReportToAttendance, 
   exportToCSV, 
   downloadCSV 
 } from '@/utils/attendanceTransform';
 import AttendanceTable from '@/components/AttendanceTable';
+import { settingsService } from '@/services/settingsService';
 
 export default function ReportPage() {
   const router = useRouter();
@@ -20,6 +21,23 @@ export default function ReportPage() {
   const [reportName, setReportName] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [baseUrl, setBaseUrl] = useState<string>('');
+  const [rawReportData, setRawReportData] = useState<RetrieveReportResponse | null>(null);
+  const [reportHeaders, setReportHeaders] = useState<string[]>([]);
+
+  // Transform data with current settings
+  const transformData = useCallback((reportData: RetrieveReportResponse, url: string) => {
+    const settings = settingsService.getOrCreateSettings(url);
+    return transformReportToAttendance(reportData, settings.fieldMapping);
+  }, []);
+
+  // Handle settings change and re-transform data
+  const handleSettingsChange = useCallback((settings: MoodleSettings) => {
+    if (rawReportData) {
+      const transformedData = transformReportToAttendance(rawReportData, settings.fieldMapping);
+      setAttendanceData(transformedData);
+    }
+  }, [rawReportData]);
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -27,10 +45,16 @@ export default function ReportPage() {
       setError(null);
       try {
         const token = process.env.NEXT_PUBLIC_MOODLE_TOKEN;
+        const moodleBaseUrl = process.env.NEXT_PUBLIC_MOODLE_BASE_URL;
+        
         if (!token) {
           throw new Error('Moodle token not configured');
         }
+        if (!moodleBaseUrl) {
+          throw new Error('Moodle base URL not configured');
+        }
 
+        setBaseUrl(moodleBaseUrl);
         const apiService = new MoodleAPIService(token);
         
         // Fetch report details
@@ -42,10 +66,27 @@ export default function ReportPage() {
 
         // Fetch complete report data
         const reportData = await apiService.retrieveCompleteReport(reportId);
-        const transformedData = transformReportToAttendance(reportData);
+        setRawReportData(reportData);
+        
+        // Store report headers for settings modal
+        if (reportData.data.headers && reportData.data.headers.length > 0) {
+          setReportHeaders(reportData.data.headers);
+        }
+        
+        // Transform with current settings
+        const transformedData = transformData(reportData, moodleBaseUrl);
         setAttendanceData(transformedData);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load report');
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load report';
+        
+        // Provide helpful error messages
+        if (errorMessage.includes('timeout') || errorMessage.includes('took too long')) {
+          setError('The Moodle server is taking too long to respond. This report may be too large. Try again or contact your administrator.');
+        } else if (errorMessage.includes('Cloudflare') || errorMessage.includes('52')) {
+          setError('The Moodle server is temporarily unavailable. Please try again in a few moments.');
+        } else {
+          setError(errorMessage);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -54,7 +95,7 @@ export default function ReportPage() {
     if (reportId) {
       fetchReport();
     }
-  }, [reportId]);
+  }, [reportId, transformData]);
 
   const handleDownloadCSV = () => {
     if (attendanceData) {
@@ -117,6 +158,15 @@ export default function ReportPage() {
           <div className="flex flex-col items-center justify-center py-20">
             <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
             <p className="mt-6 text-gray-600 font-medium">Loading attendance data...</p>
+            <p className="mt-2 text-sm text-gray-500">This may take up to a minute for large reports</p>
+            <div className="mt-4 max-w-md">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-xs text-blue-800">
+                  💡 <strong>Tip:</strong> We&apos;re fetching data in small batches to ensure reliability. 
+                  The server is working on your request...
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -155,7 +205,12 @@ export default function ReportPage() {
 
         {/* Attendance Table */}
         {attendanceData && !isLoading && (
-          <AttendanceTable data={attendanceData} />
+          <AttendanceTable 
+            data={attendanceData} 
+            baseUrl={baseUrl}
+            reportHeaders={reportHeaders}
+            onSettingsChange={handleSettingsChange}
+          />
         )}
       </main>
     </div>

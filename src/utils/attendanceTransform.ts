@@ -4,7 +4,9 @@ import {
   StudentAttendance,
   AttendanceStatus,
   SessionDate,
-  SessionInfo
+  SessionInfo,
+  FieldMapping,
+  DEFAULT_FIELD_MAPPING
 } from '@/types/moodle';
 
 export function parseAttendanceStatus(value: string | number | null): AttendanceStatus {
@@ -39,20 +41,25 @@ function extractDate(dateStr: string): string {
   }
 }
 
-export function transformReportToAttendance(reportData: RetrieveReportResponse): AttendanceTableData {
+export function transformReportToAttendance(
+  reportData: RetrieveReportResponse,
+  fieldMapping: FieldMapping = DEFAULT_FIELD_MAPPING
+): AttendanceTableData {
   const { rows } = reportData.data;
   if (!rows || rows.length === 0) {
     return { students: [], sessionDates: [] };
   }
-  const courseIndex = 0;
-  const nameIndex = 1;
-  const dateIndex = 2;
-  const statusIndex = 3;
-  const gradeIndex = 4;
-  const totalPIndex = 5;
-  const totalLIndex = 6;
-  const totalEIndex = 7;
-  const totalAIndex = 8;
+  
+  // Use custom field mapping
+  const courseIndex = fieldMapping.courseNameIndex;
+  const nameIndex = fieldMapping.studentNameIndex;
+  const dateIndex = fieldMapping.dateTimeIndex;
+  const statusIndex = fieldMapping.statusIndex;
+  const gradeIndex = fieldMapping.gradeIndex;
+  const totalPIndex = fieldMapping.totalPresentIndex;
+  const totalLIndex = fieldMapping.totalLateIndex;
+  const totalEIndex = fieldMapping.totalExcusedIndex;
+  const totalAIndex = fieldMapping.totalAbsentIndex;
   const sessionsMap = new Map<string, SessionInfo>();
   const studentsMap = new Map<string, StudentAttendance>();
   rows.forEach((row) => {

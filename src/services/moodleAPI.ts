@@ -4,8 +4,6 @@ import {
   MoodleAPIParams 
 } from '@/types/moodle';
 
-const BASE_URL = 'https://moodle.aflahdev.me/webservice/rest/server.php';
-
 class MoodleAPIService {
   private wstoken: string;
 
@@ -14,28 +12,24 @@ class MoodleAPIService {
   }
 
   /**
-   * Make a request to the Moodle API
+   * Make a request to the Moodle API via Next.js API route (bypasses CORS)
    */
   private async makeRequest<T>(params: MoodleAPIParams): Promise<T> {
-    const queryParams = new URLSearchParams(
-      Object.entries(params).reduce((acc, [key, value]) => {
-        acc[key] = String(value);
-        return acc;
-      }, {} as Record<string, string>)
-    );
-
-    const url = `${BASE_URL}?${queryParams.toString()}`;
+    // Use Next.js API route as proxy to bypass CORS
+    const url = '/api/moodle';
 
     try {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify(params),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -86,7 +80,7 @@ class MoodleAPIService {
    * Automatically fetches all pages based on totalrowcount
    * Assumes 10 rows per page (Moodle default)
    */
-  async retrieveCompleteReport(reportId: number): Promise<RetrieveReportResponse> {
+  async retrieveCompleteReport(reportId: number, sequential = false): Promise<RetrieveReportResponse> {
     // Get first page to determine total count
     const firstPage = await this.retrieveReport(reportId, 0);
     const totalRows = firstPage.data.totalrowcount;
@@ -100,19 +94,68 @@ class MoodleAPIService {
       return firstPage;
     }
 
-    // Fetch remaining pages
-    const pagePromises: Promise<RetrieveReportResponse>[] = [];
-    for (let page = 1; page < totalPages; page++) {
-      pagePromises.push(this.retrieveReport(reportId, page));
+    const allRows = [...firstPage.data.rows];
+
+    // If sequential mode or very large report, fetch one at a time
+    if (sequential || totalPages > 50) {
+      console.log('📥 Using sequential mode for reliability...');
+      
+      for (let page = 1; page < totalPages; page++) {
+        try {
+          console.log(`📄 Fetching page ${page + 1} of ${totalPages}...`);
+          const pageData = await this.retrieveReport(reportId, page);
+          allRows.push(...pageData.data.rows);
+          
+          // Small delay between requests
+          if (page < totalPages - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch page ${page + 1}, retrying...`, err);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          const pageData = await this.retrieveReport(reportId, page);
+          allRows.push(...pageData.data.rows);
+        }
+      }
+    } else {
+      // Batch mode for smaller reports
+      const BATCH_SIZE = 3; // 3 pages at a time for better reliability
+
+      for (let batchStart = 1; batchStart < totalPages; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, totalPages);
+        const batchPages = [];
+        
+        console.log(`📥 Fetching pages ${batchStart + 1} to ${batchEnd} of ${totalPages}...`);
+
+        for (let page = batchStart; page < batchEnd; page++) {
+          batchPages.push(page);
+        }
+
+        // Fetch batch with error handling
+        const batchPromises = batchPages.map(async (page) => {
+          try {
+            return await this.retrieveReport(reportId, page);
+          } catch (err) {
+            console.warn(`Failed to fetch page ${page + 1}, retrying after delay...`, err);
+            // Retry once after a longer delay
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return await this.retrieveReport(reportId, page);
+          }
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        
+        // Add rows from this batch
+        batchResults.forEach(result => {
+          allRows.push(...result.data.rows);
+        });
+
+        // Longer delay between batches
+        if (batchEnd < totalPages) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
     }
-
-    const remainingPages = await Promise.all(pagePromises);
-
-    // Combine all rows
-    const allRows = [
-      ...firstPage.data.rows,
-      ...remainingPages.flatMap(p => p.data.rows)
-    ];
 
     console.log(`✅ Successfully fetched ${allRows.length} rows from ${totalPages} pages`);
 

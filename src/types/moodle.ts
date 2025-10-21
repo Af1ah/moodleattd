@@ -74,6 +74,41 @@ export interface AttendanceTableData {
   sessionDates: SessionDate[];
 }
 
+// Moodle Settings for field mapping
+
+export interface FieldMapping {
+  courseNameIndex: number;
+  studentNameIndex: number;
+  dateTimeIndex: number;
+  statusIndex: number;
+  gradeIndex: number;
+  totalPresentIndex: number;
+  totalLateIndex: number;
+  totalExcusedIndex: number;
+  totalAbsentIndex: number;
+}
+
+export interface MoodleSettings {
+  baseUrl: string;
+  fieldMapping: FieldMapping;
+  useCourseName: boolean; // true = use course name, false = use student name
+  swapFields: boolean; // swap course and student fields
+  lastUpdated: number;
+}
+
+// Default field mapping (original implementation)
+export const DEFAULT_FIELD_MAPPING: FieldMapping = {
+  courseNameIndex: 0,
+  studentNameIndex: 1,
+  dateTimeIndex: 2,
+  statusIndex: 3,
+  gradeIndex: 4,
+  totalPresentIndex: 5,
+  totalLateIndex: 6,
+  totalExcusedIndex: 7,
+  totalAbsentIndex: 8,
+};
+
 // API Request Parameters
 
 export interface MoodleAPIParams {
