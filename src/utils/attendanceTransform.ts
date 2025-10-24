@@ -45,7 +45,7 @@ export function transformReportToAttendance(
   reportData: RetrieveReportResponse,
   fieldMapping: FieldMapping = DEFAULT_FIELD_MAPPING
 ): AttendanceTableData {
-  const { rows } = reportData.data;
+  const { rows, headers } = reportData.data;
   if (!rows || rows.length === 0) {
     return { students: [], sessionDates: [] };
   }
@@ -62,8 +62,30 @@ export function transformReportToAttendance(
   const totalAIndex = fieldMapping.totalAbsentIndex;
   const sessionsMap = new Map<string, SessionInfo>();
   const studentsMap = new Map<string, StudentAttendance>();
+  
   rows.forEach((row) => {
-    const columns = Array.isArray(row.columns) ? row.columns : Object.values(row);
+    // Support both array-based and object-based row structures
+    let columns: (string | number | null)[];
+    
+    if (Array.isArray(row.columns)) {
+      // Standard array format
+      columns = row.columns;
+    } else if (row.columns) {
+      // Object format - convert to array using headers as guide
+      columns = Object.values(row.columns) as (string | number | null)[];
+    } else if (headers && headers.length > 0) {
+      // Use headers to extract values from row object
+      columns = headers.map(header => {
+        const value = row[header];
+        return (value !== undefined && value !== null && typeof value !== 'object') ? value : null;
+      }) as (string | number | null)[];
+    } else {
+      // Fallback: convert row object to array of values
+      columns = Object.values(row).filter(val => 
+        typeof val === 'string' || typeof val === 'number' || val === null
+      ) as (string | number | null)[];
+    }
+    
     const courseName = String(columns[courseIndex] || 'Unknown Course');
     const studentName = String(columns[nameIndex] || 'Unknown Student');
     const sessionDateTime = String(columns[dateIndex] || '');

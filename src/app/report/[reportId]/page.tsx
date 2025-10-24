@@ -18,6 +18,7 @@ export default function ReportPage() {
   const reportId = Number(params.reportId);
   
   const [attendanceData, setAttendanceData] = useState<AttendanceTableData | null>(null);
+  const [filteredAttendanceData, setFilteredAttendanceData] = useState<AttendanceTableData | null>(null);
   const [reportName, setReportName] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,8 +99,10 @@ export default function ReportPage() {
   }, [reportId, transformData]);
 
   const handleDownloadCSV = () => {
-    if (attendanceData) {
-      const csv = exportToCSV(attendanceData);
+    // Use filtered data if available, otherwise use original data
+    const dataToExport = filteredAttendanceData || attendanceData;
+    if (dataToExport) {
+      const csv = exportToCSV(dataToExport);
       const filename = `${reportName || 'attendance_report'}_${new Date().toISOString().split('T')[0]}.csv`;
       downloadCSV(csv, filename);
     }
@@ -210,6 +213,7 @@ export default function ReportPage() {
             baseUrl={baseUrl}
             reportHeaders={reportHeaders}
             onSettingsChange={handleSettingsChange}
+            onFilteredDataChange={setFilteredAttendanceData}
           />
         )}
       </main>
