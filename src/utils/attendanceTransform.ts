@@ -72,13 +72,13 @@ export function transformReportToAttendance(
       columns = row.columns;
     } else if (row.columns) {
       // Object format - convert to array using headers as guide
-      columns = Object.values(row.columns);
+      columns = Object.values(row.columns) as (string | number | null)[];
     } else if (headers && headers.length > 0) {
       // Use headers to extract values from row object
       columns = headers.map(header => {
         const value = row[header];
-        return value !== undefined ? value : null;
-      });
+        return (value !== undefined && value !== null && typeof value !== 'object') ? value : null;
+      }) as (string | number | null)[];
     } else {
       // Fallback: convert row object to array of values
       columns = Object.values(row).filter(val => 
