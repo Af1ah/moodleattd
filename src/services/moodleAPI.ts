@@ -78,7 +78,7 @@ class MoodleAPIService {
   /**
    * Retrieve ALL pages of a report's data
    * Automatically fetches all pages based on totalrowcount
-   * Assumes 10 rows per page (Moodle default)
+   * Uses optimized parallel fetching with batch control
    */
   async retrieveCompleteReport(reportId: number, sequential = false): Promise<RetrieveReportResponse> {
     // Get first page to determine total count
@@ -106,20 +106,20 @@ class MoodleAPIService {
           const pageData = await this.retrieveReport(reportId, page);
           allRows.push(...pageData.data.rows);
           
-          // Small delay between requests
+          // Small delay between requests for sequential mode
           if (page < totalPages - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 300));
           }
         } catch (err) {
           console.warn(`Failed to fetch page ${page + 1}, retrying...`, err);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          await new Promise(resolve => setTimeout(resolve, 1000));
           const pageData = await this.retrieveReport(reportId, page);
           allRows.push(...pageData.data.rows);
         }
       }
     } else {
-      // Batch mode for smaller reports
-      const BATCH_SIZE = 3; // 3 pages at a time for better reliability
+      // Optimized parallel batch mode for better performance
+      const BATCH_SIZE = 5; // Increased from 3 for faster loading
 
       for (let batchStart = 1; batchStart < totalPages; batchStart += BATCH_SIZE) {
         const batchEnd = Math.min(batchStart + BATCH_SIZE, totalPages);
@@ -131,28 +131,28 @@ class MoodleAPIService {
           batchPages.push(page);
         }
 
-        // Fetch batch with error handling
+        // Fetch all pages in batch simultaneously
         const batchPromises = batchPages.map(async (page) => {
           try {
             return await this.retrieveReport(reportId, page);
           } catch (err) {
-            console.warn(`Failed to fetch page ${page + 1}, retrying after delay...`, err);
-            // Retry once after a longer delay
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.warn(`Failed to fetch page ${page + 1}, retrying...`, err);
+            // Single retry with minimal delay
+            await new Promise(resolve => setTimeout(resolve, 500));
             return await this.retrieveReport(reportId, page);
           }
         });
 
         const batchResults = await Promise.all(batchPromises);
         
-        // Add rows from this batch
+        // Add rows from this batch in order
         batchResults.forEach(result => {
           allRows.push(...result.data.rows);
         });
 
-        // Longer delay between batches
+        // Reduced delay between batches for faster loading
         if (batchEnd < totalPages) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
     }

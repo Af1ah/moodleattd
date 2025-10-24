@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { AttendanceTableData, AttendanceStatus, MoodleSettings } from '@/types/moodle';
 import FilterModal, { DateRange } from './FilterModal';
 import SettingsModal from './SettingsModalNew';
@@ -10,6 +10,7 @@ interface AttendanceTableProps {
   baseUrl?: string;
   reportHeaders?: string[];
   onSettingsChange?: (settings: MoodleSettings) => void;
+  onFilteredDataChange?: (filteredData: AttendanceTableData) => void;
 }
 
 // Helper function to get current week range
@@ -54,7 +55,7 @@ const courseColors = [
   'bg-indigo-50',
 ];
 
-export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onSettingsChange }: AttendanceTableProps) {
+export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onSettingsChange, onFilteredDataChange }: AttendanceTableProps) {
   const { students, sessionDates } = data;
   
   // Extract all unique course names
@@ -215,6 +216,17 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
       };
     });
   }, [students, sessionBasedTracking, filteredSessionDates, calculateDayAttendance]);
+
+  // Notify parent of filtered data changes
+  useEffect(() => {
+    if (onFilteredDataChange) {
+      const filteredData: AttendanceTableData = {
+        students: studentsWithSessionTracking,
+        sessionDates: filteredSessionDates,
+      };
+      onFilteredDataChange(filteredData);
+    }
+  }, [studentsWithSessionTracking, filteredSessionDates, onFilteredDataChange]);
 
   if (students.length === 0) {
     return (
