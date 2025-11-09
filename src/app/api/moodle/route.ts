@@ -47,14 +47,25 @@ async function fetchWithRetry(
 
 export async function POST(request: NextRequest) {
   try {
+    // Get token from Authorization header
+    const authorization = request.headers.get('authorization');
+    if (!authorization || !authorization.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Missing or invalid Authorization header' },
+        { status: 401 }
+      );
+    }
+
+    const wstoken = authorization.split(' ')[1];
+    
     // Get parameters from request body
     const body = await request.json();
-    const { wstoken, wsfunction, moodlewsrestformat, ...otherParams } = body;
+    const { wsfunction, moodlewsrestformat, ...otherParams } = body;
 
     // Validate required parameters
-    if (!wstoken || !wsfunction) {
+    if (!wsfunction) {
       return NextResponse.json(
-        { error: 'Missing required parameters: wstoken and wsfunction' },
+        { error: 'Missing required parameter: wsfunction' },
         { status: 400 }
       );
     }
@@ -79,7 +90,8 @@ export async function POST(request: NextRequest) {
       }, {} as Record<string, string>),
     });
 
-    const url = `${baseUrl}?${queryParams.toString()}`;
+    const url = `${baseUrl}/webservice/rest/server.php?${queryParams.toString()}`;
+    console.log('Making request to URL:', url);
 
     // Make request with retry logic
     const response = await fetchWithRetry(url, {
@@ -108,7 +120,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+      console.log('Moodle response:', data);
+    } catch {
+      const text = await response.text();
+      console.error('Failed to parse JSON response:', text.substring(0, 500));
+      return NextResponse.json(
+        { 
+          error: 'Moodle server returned invalid response (HTML instead of JSON). Check if web services are enabled.',
+          details: text.substring(0, 200)
+        },
+        { status: 502 }
+      );
+    }
 
     // Check for Moodle API errors
     if (data.exception) {

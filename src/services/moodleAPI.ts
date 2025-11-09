@@ -23,8 +23,13 @@ class MoodleAPIService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.wstoken}`,
         },
-        body: JSON.stringify(params),
+        body: JSON.stringify({
+          ...params,
+          // Remove wstoken from body since it's now in the header
+          wstoken: undefined,
+        }),
       });
 
       if (!response.ok) {
@@ -52,7 +57,6 @@ class MoodleAPIService {
    */
   async listReports(): Promise<ListReportsResponse> {
     return this.makeRequest<ListReportsResponse>({
-      wstoken: this.wstoken,
       wsfunction: 'core_reportbuilder_list_reports',
       moodlewsrestformat: 'json',
     });
@@ -67,7 +71,6 @@ class MoodleAPIService {
     page: number = 0
   ): Promise<RetrieveReportResponse> {
     return this.makeRequest<RetrieveReportResponse>({
-      wstoken: this.wstoken,
       wsfunction: 'core_reportbuilder_retrieve_report',
       moodlewsrestformat: 'json',
       reportid: reportId,

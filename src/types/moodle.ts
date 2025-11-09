@@ -112,8 +112,8 @@ export const DEFAULT_FIELD_MAPPING: FieldMapping = {
 // API Request Parameters
 
 export interface MoodleAPIParams {
-  wstoken: string;
+  wstoken?: string;
   wsfunction: string;
   moodlewsrestformat: string;
-  [key: string]: string | number;
+  [key: string]: string | number | undefined;
 }
