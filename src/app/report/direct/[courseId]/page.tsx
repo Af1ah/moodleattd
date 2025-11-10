@@ -35,6 +35,44 @@ interface DirectAttendanceResponse {
   courseName?: string;
 }
 
+// Validate direct attendance session data structure
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function validateDirectAttendanceData(sessions: any[]): { warnings: string[]; isValid: boolean } {
+  const warnings: string[] = [];
+  let isValid = true;
+
+  if (!sessions || !Array.isArray(sessions)) {
+    return { warnings: ['No attendance sessions data received'], isValid: false };
+  }
+
+  if (sessions.length === 0) {
+    return { warnings: ['No attendance sessions found for this course'], isValid: false };
+  }
+
+  // Check essential fields in sessions
+  const sampleSession = sessions[0];
+  
+  if (!sampleSession.sessdate) {
+    warnings.push('Session date information missing - dates may not display correctly');
+  }
+  
+  if (!sampleSession.users || !Array.isArray(sampleSession.users)) {
+    warnings.push('Student user data missing or invalid');
+    isValid = false;
+  }
+  
+  if (!sampleSession.statuses || !Array.isArray(sampleSession.statuses)) {
+    warnings.push('Attendance status definitions missing - attendance may not be calculated correctly');
+  }
+  
+  if (!sampleSession.attendance_log || !Array.isArray(sampleSession.attendance_log)) {
+    warnings.push('Attendance records missing - all attendance may show as unmarked');
+  }
+
+  return { warnings, isValid };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 // Transform attendance sessions to AttendanceTableData format
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function transformSessionsToTable(sessions: any[], courseName: string): AttendanceTableData {
@@ -102,15 +140,14 @@ function transformSessionsToTable(sessions: any[], courseName: string): Attendan
           const statusObj = session.statuses.find((s: any) => s.id.toString() === statusId.toString());
           if (statusObj && statusObj.acronym) {
             const acronym = statusObj.acronym.toUpperCase();
-            if (acronym === 'P') { status = 'P'; student.totalPresent++; }
-            else if (acronym === 'A') { status = 'A'; student.totalAbsent++; }
-            else if (acronym === 'L') { status = 'L'; student.totalLate++; }
-            else if (acronym === 'E') { status = 'E'; student.totalExcused++; }
+            if (acronym === 'P') { status = 'P'; }
+            else if (acronym === 'A') { status = 'A'; }
+            else if (acronym === 'L') { status = 'L'; }
+            else if (acronym === 'E') { status = 'E'; }
           }
         }
 
         student.sessions[sessionId] = status;
-        if (status !== '-') student.totalSessions++;
       });
     }
   });
@@ -124,6 +161,7 @@ function transformSessionsToTable(sessions: any[], courseName: string): Attendan
     }))
     .sort((a, b) => a.timestamp - b.timestamp);
 
+  // Note: Totals will be calculated in AttendanceTable based on filtered date range
   return {
     students: Array.from(studentsMap.values()),
     sessionDates
@@ -141,6 +179,7 @@ function DirectAttendanceReport() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [courseName, setCourseName] = useState<string>('');
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchDirectAttendance = async () => {
@@ -153,7 +192,7 @@ function DirectAttendanceReport() {
           throw new Error('No authentication token found');
         }
 
-        // First get course info
+                // First get course info
         let fetchedCourseName = '';
         const courseResponse = await fetch('/api/moodle/', {
           method: 'POST',
@@ -162,13 +201,15 @@ function DirectAttendanceReport() {
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            wsfunction: 'core_course_get_courses',
+            wsfunction: 'core_course_get_enrolled_courses_by_timeline_classification',
+            classification: 'all',
             moodlewsrestformat: 'json',
           }),
         });
 
         if (courseResponse.ok) {
-          const courses = await courseResponse.json();
+          const courseData = await courseResponse.json();
+          const courses = courseData.courses || [];
           const course = courses.find((c: {id: number; fullname: string}) => c.id === courseId);
           if (course) {
             fetchedCourseName = course.fullname;
@@ -176,8 +217,8 @@ function DirectAttendanceReport() {
           }
         }
 
-        // Get attendance sessions using both tokens
-        const attendanceToken = process.env.NEXT_PUBLIC_ATTD_TOKEN || '888ed6cc0dc0a016d7034d05d789cf84';
+        // Get attendance sessions
+        // Note: attendanceToken will be retrieved on server-side in the API
         const response = await fetch('/api/getAttendanceDirect', {
           method: 'POST',
           headers: {
@@ -185,8 +226,7 @@ function DirectAttendanceReport() {
           },
           body: JSON.stringify({
             courseId: courseId,
-            wstoken: attendanceToken,  // Attendance token for sessions
-            userToken: token,           // User token for course contents
+            userToken: token,  // User token for course contents
           }),
         });
 
@@ -199,6 +239,18 @@ function DirectAttendanceReport() {
         
         if (!sessionsResponse.success || !sessionsResponse.sessions) {
           throw new Error('No attendance sessions found for this course');
+        }
+
+        // Validate the session data structure - this is for direct gradebook only
+        const validation = validateDirectAttendanceData(sessionsResponse.sessions);
+        setValidationWarnings(validation.warnings);
+        
+        if (!validation.isValid) {
+          throw new Error(`Invalid attendance data structure: ${validation.warnings.join(', ')}`);
+        }
+        
+        if (validation.warnings.length > 0) {
+          console.warn('⚠️ Direct attendance data validation warnings:', validation.warnings);
         }
 
         console.log(`✅ Retrieved ${sessionsResponse.totalSessions} attendance sessions`);
@@ -305,6 +357,33 @@ function DirectAttendanceReport() {
           </div>
         </div>
       </header>
+
+      {/* Validation Warnings */}
+      {validationWarnings.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <div className="flex items-start">
+              <div className="shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">
+                  Data Structure Warnings
+                </h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <ul className="list-disc list-inside space-y-1">
+                    {validationWarnings.map((warning, index) => (
+                      <li key={index}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

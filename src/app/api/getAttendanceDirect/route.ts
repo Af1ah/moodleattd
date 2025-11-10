@@ -12,12 +12,15 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { courseId, wstoken, userToken } = body;
+    const { courseId, userToken } = body;
 
+    // Get attendance token from environment (server-side only)
+    const wstoken = process.env.NEXT_PUBLIC_ATTD_TOKEN;
+    
     if (!wstoken) {
       return NextResponse.json(
-        { error: 'Missing attendance wstoken' },
-        { status: 400 }
+        { error: 'Attendance token not configured on server' },
+        { status: 500 }
       );
     }
 

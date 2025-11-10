@@ -28,17 +28,41 @@ function ReportContent() {
   const [rawReportData, setRawReportData] = useState<RetrieveReportResponse | null>(null);
   const [reportHeaders, setReportHeaders] = useState<string[]>([]);
 
-  // Transform data with current settings
+  // Transform data with smart mapping by default
   const transformData = useCallback((reportData: RetrieveReportResponse, url: string) => {
-    const settings = settingsService.getOrCreateSettings(url);
-    return transformReportToAttendance(reportData, settings.fieldMapping);
+    try {
+      // Always try smart mapping first
+      console.log('🤖 Attempting smart header mapping...');
+      const result = transformReportToAttendance(reportData);
+      console.log('✅ Smart mapping successful!');
+      return result;
+    } catch (smartMappingError) {
+      console.warn('⚠️ Smart mapping encountered an issue:', smartMappingError);
+      console.log('🔄 Falling back to manual field mapping from settings...');
+      
+      try {
+        // Fallback to settings-based mapping
+        const settings = settingsService.getOrCreateSettings(url);
+        const result = transformReportToAttendance(reportData, settings.fieldMapping);
+        console.log('✅ Settings-based mapping successful!');
+        return result;
+      } catch (settingsError) {
+        console.error('❌ Both smart and settings-based mapping failed:', settingsError);
+        throw new Error(`Unable to process report data. Please configure field mappings manually in Moodle Settings. Error: ${settingsError instanceof Error ? settingsError.message : 'Unknown error'}`);
+      }
+    }
   }, []);
 
   // Handle settings change and re-transform data
   const handleSettingsChange = useCallback((settings: MoodleSettings) => {
     if (rawReportData) {
-      const transformedData = transformReportToAttendance(rawReportData, settings.fieldMapping);
-      setAttendanceData(transformedData);
+      try {
+        const transformedData = transformReportToAttendance(rawReportData, settings.fieldMapping);
+        setAttendanceData(transformedData);
+      } catch (error) {
+        console.error('Failed to transform with custom settings:', error);
+        setError(error instanceof Error ? error.message : 'Failed to apply field mapping settings');
+      }
     }
   }, [rawReportData]);
 
@@ -85,9 +109,12 @@ function ReportContent() {
         setAttendanceData(transformedData);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to load report';
+        console.error('Report loading error:', err);
         
         // Provide helpful error messages
-        if (errorMessage.includes('timeout') || errorMessage.includes('took too long')) {
+        if (errorMessage.includes('Unable to process data')) {
+          setError('The report structure is not compatible with attendance processing. Please check the Moodle Settings to configure field mappings manually.');
+        } else if (errorMessage.includes('timeout') || errorMessage.includes('took too long')) {
           setError('The Moodle server is taking too long to respond. This report may be too large. Try again or contact your administrator.');
         } else if (errorMessage.includes('Cloudflare') || errorMessage.includes('52')) {
           setError('The Moodle server is temporarily unavailable. Please try again in a few moments.');

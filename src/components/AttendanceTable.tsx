@@ -85,6 +85,9 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
   // State for date range filter (default to current month)
   const [dateRange, setDateRange] = useState<DateRange>(getCurrentWeekRange());
 
+  // State for hiding non-taken sessions
+  const [hideNonTakenSessions, setHideNonTakenSessions] = useState(false);
+
   // Update selected courses when allCourses changes (ensure all are checked by default)
   useEffect(() => {
     if (allCourses.length > 0) {
@@ -136,6 +139,26 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
       }))
       .filter(dateGroup => dateGroup.sessions.length > 0);
   }, [sessionDates, selectedCourses, dateRange]);
+
+  // Filter to hide non-taken sessions (sessions where all students have '-' status)
+  const visibleSessionDates = useMemo(() => {
+    if (!hideNonTakenSessions) {
+      return filteredSessionDates;
+    }
+
+    return filteredSessionDates
+      .map(dateGroup => ({
+        ...dateGroup,
+        sessions: dateGroup.sessions.filter(session => {
+          // Check if any student has a non-'-' status for this session
+          return students.some(student => {
+            const status = student.sessions[session.sessionId];
+            return status && status !== '-';
+          });
+        }),
+      }))
+      .filter(dateGroup => dateGroup.sessions.length > 0);
+  }, [filteredSessionDates, hideNonTakenSessions, students]);
 
   // Assign colors to courses
   const courseColorMap = useMemo(() => {
@@ -192,16 +215,50 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
     }
   }, []);
 
+  // Calculate student totals based on visible (filtered) sessions only
+  const studentsWithRecalculatedTotals = useMemo(() => {
+    return students.map(student => {
+      let totalPresent = 0;
+      let totalAbsent = 0;
+      let totalLate = 0;
+      let totalExcused = 0;
+      let totalSessions = 0;
+
+      // Count only sessions in the visible range
+      visibleSessionDates.forEach(dateGroup => {
+        dateGroup.sessions.forEach(session => {
+          const status = student.sessions[session.sessionId];
+          if (status && status !== '-') {
+            totalSessions++;
+            if (status === 'P') totalPresent++;
+            else if (status === 'A') totalAbsent++;
+            else if (status === 'L') totalLate++;
+            else if (status === 'E') totalExcused++;
+          }
+        });
+      });
+
+      return {
+        ...student,
+        totalPresent,
+        totalAbsent,
+        totalLate,
+        totalExcused,
+        totalSessions,
+      };
+    });
+  }, [students, visibleSessionDates]);
+
   // Calculate student totals for session-based tracking
   const studentsWithSessionTracking = useMemo(() => {
-    if (!sessionBasedTracking) return students;
+    if (!sessionBasedTracking) return studentsWithRecalculatedTotals;
     
-    return students.map(student => {
+    return studentsWithRecalculatedTotals.map(student => {
       let totalPresent = 0;
       let totalAbsent = 0;
       let totalHalfDay = 0;
       
-      filteredSessionDates.forEach(dateGroup => {
+      visibleSessionDates.forEach(dateGroup => {
         const dayAttendance = calculateDayAttendance(dateGroup, student.sessions);
         if (dayAttendance === 1) {
           totalPresent += 1;
@@ -217,21 +274,23 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
         totalPresent,
         totalAbsent,
         totalHalfDay,
-        totalSessions: filteredSessionDates.length,
+        totalLate: 0, // Not used in session-based tracking
+        totalExcused: 0, // Not used in session-based tracking
+        totalSessions: visibleSessionDates.length,
       };
     });
-  }, [students, sessionBasedTracking, filteredSessionDates, calculateDayAttendance]);
+  }, [studentsWithRecalculatedTotals, sessionBasedTracking, visibleSessionDates, calculateDayAttendance]);
 
   // Notify parent of filtered data changes
   useEffect(() => {
     if (onFilteredDataChange) {
       const filteredData: AttendanceTableData = {
         students: studentsWithSessionTracking,
-        sessionDates: filteredSessionDates,
+        sessionDates: visibleSessionDates,
       };
       onFilteredDataChange(filteredData);
     }
-  }, [studentsWithSessionTracking, filteredSessionDates, onFilteredDataChange]);
+  }, [studentsWithSessionTracking, visibleSessionDates, onFilteredDataChange]);
 
   if (students.length === 0) {
     return (
@@ -245,22 +304,23 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
     <div className="space-y-4">
       {/* Filter Button */}
       <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowFilters(true)}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-md hover:shadow-lg active:scale-98 transform"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-              <span className="font-medium">Filters</span>
-              {selectedCourses.size < allCourses.length && (
-                <span className="ml-1 px-2.5 py-0.5 bg-white text-blue-600 rounded-full text-xs font-bold">
-                  {selectedCourses.size}/{allCourses.length}
-                </span>
-              )}
-            </button>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowFilters(true)}
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-md hover:shadow-lg active:scale-98 transform"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span className="font-medium">Filters</span>
+                {selectedCourses.size < allCourses.length && (
+                  <span className="ml-1 px-2.5 py-0.5 bg-white text-blue-600 rounded-full text-xs font-bold">
+                    {selectedCourses.size}/{allCourses.length}
+                  </span>
+                )}
+              </button>
             
             {baseUrl && (
               <button
@@ -274,23 +334,24 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                 </svg>
               </button>
             )}
-          </div>
-          
-          {/* Date Range Display */}
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className="font-medium">
-              {dateRange.option === 'week' && 'Current Week: '}
-              {dateRange.option === 'month' && 'Current Month: '}
-              {dateRange.option === 'custom' && 'Custom Range: '}
-              <span className="text-gray-900">
-                {new Date(dateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                {' - '}
-                {new Date(dateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </div>
+            
+            {/* Date Range Display */}
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="font-medium">
+                {dateRange.option === 'week' && 'Current Week: '}
+                {dateRange.option === 'month' && 'Current Month: '}
+                {dateRange.option === 'custom' && 'Custom Range: '}
+                <span className="text-gray-900">
+                  {new Date(dateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {' - '}
+                  {new Date(dateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
               </span>
-            </span>
+            </div>
           </div>
         </div>
       </div>
@@ -308,6 +369,8 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
         onToggleSessionTracking={setSessionBasedTracking}
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
+        hideNonTakenSessions={hideNonTakenSessions}
+        onToggleHideNonTaken={setHideNonTakenSessions}
       />
 
       {/* Settings Modal */}
@@ -325,19 +388,42 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
         />
       )}
 
+      {/* No Sessions Message */}
+      {visibleSessionDates.length === 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <svg className="w-16 h-16 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            No Attendance Taken
+          </h3>
+          <p className="text-gray-600">
+            {hideNonTakenSessions 
+              ? 'No sessions with recorded attendance found in the selected date range.'
+              : 'No sessions found in the selected date range.'}
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            Try adjusting your filters or selecting a different date range.
+          </p>
+        </div>
+      )}
+
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            {/* Date Row */}
-            <tr>
-              <th 
-                rowSpan={sessionBasedTracking ? 1 : 2}
-                className="sticky left-0 z-20 px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-50 border-r border-gray-300"
-              >
-                Student Name
-              </th>
-              {filteredSessionDates.map((dateGroup, dateIndex) => (
+      {visibleSessionDates.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              {/* Date Row */}
+              <tr>
+                <th 
+                  rowSpan={sessionBasedTracking ? 1 : 2}
+                  className="sticky left-0 z-20 px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-50 border-r border-gray-300"
+                >
+                  Student Name
+                </th>
+                {visibleSessionDates.map((dateGroup, dateIndex) => (
                 <th
                   key={dateIndex}
                   colSpan={sessionBasedTracking ? 1 : dateGroup.sessions.length}
@@ -384,7 +470,7 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
             {/* Session Details Row - Hide when session-based tracking is enabled */}
             {!sessionBasedTracking && (
               <tr>
-                {filteredSessionDates.map((dateGroup, dateIndex) =>
+                {visibleSessionDates.map((dateGroup, dateIndex) =>
                   dateGroup.sessions.map((session, sessionIndex) => (
                     <th
                       key={`${dateIndex}-${sessionIndex}`}
@@ -411,7 +497,7 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                   <td className="sticky left-0 z-10 px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-white border-r border-gray-300">
                     {student.studentName}
                   </td>
-                  {filteredSessionDates.map((dateGroup, dateIndex) => {
+                  {visibleSessionDates.map((dateGroup, dateIndex) => {
                     // If session-based tracking is enabled, show day attendance
                     if (sessionBasedTracking) {
                       const dayAttendance = calculateDayAttendance(dateGroup, student.sessions);
@@ -478,46 +564,47 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
           </tbody>
         </table>
         
-        {/* Legend */}
-        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-          <div className="flex flex-wrap gap-4 text-xs">
-            <span className="text-gray-700 font-medium">Legend:</span>
-            {sessionBasedTracking ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 rounded font-semibold bg-green-100 text-green-800">
-                    P
-                  </span>
-                  <span className="text-gray-700">Full Day Present (1)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 rounded font-semibold bg-yellow-100 text-yellow-800">
-                    0.5
-                  </span>
-                  <span className="text-gray-700">Half Day (0.5)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-2 py-1 rounded font-semibold bg-red-100 text-red-800">
-                    A
-                  </span>
-                  <span className="text-gray-700">Absent (0)</span>
-                </div>
-              </>
-            ) : (
-              <>
-                {Object.entries(statusLabels).map(([status, label]) => (
-                  <div key={status} className="flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded font-semibold ${statusColors[status as AttendanceStatus]}`}>
-                      {status}
+          {/* Legend */}
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+            <div className="flex flex-wrap gap-4 text-xs">
+              <span className="text-gray-700 font-medium">Legend:</span>
+              {sessionBasedTracking ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 rounded font-semibold bg-green-100 text-green-800">
+                      P
                     </span>
-                    <span className="text-gray-700">{label}</span>
+                    <span className="text-gray-700">Full Day Present (1)</span>
                   </div>
-                ))}
-              </>
-            )}
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 rounded font-semibold bg-yellow-100 text-yellow-800">
+                      0.5
+                    </span>
+                    <span className="text-gray-700">Half Day (0.5)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 rounded font-semibold bg-red-100 text-red-800">
+                      A
+                    </span>
+                    <span className="text-gray-700">Absent (0)</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {Object.entries(statusLabels).map(([status, label]) => (
+                    <div key={status} className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded font-semibold ${statusColors[status as AttendanceStatus]}`}>
+                        {status}
+                      </span>
+                      <span className="text-gray-700">{label}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

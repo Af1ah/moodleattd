@@ -35,15 +35,19 @@ function MainContent() {
         const apiService = new MoodleAPIService(token);
         const response = await apiService.listReports();
         setReports(response.reports || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load reports');
+      } catch {
+        // If listReports fails, it's likely a student without report access
+        // Redirect to student's personal attendance view
+        console.log('Reports access failed, redirecting to student attendance view');
+        router.push('/my-attendance');
+        // Don't set error here, as this is expected for students
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchReports();
-  }, []);
+  }, [router]);
 
   const fetchCourses = async () => {
     setIsLoadingCourses(true);
@@ -61,7 +65,8 @@ function MainContent() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          wsfunction: 'core_course_get_courses',
+          wsfunction: 'core_course_get_enrolled_courses_by_timeline_classification',
+          classification: 'all',
           moodlewsrestformat: 'json',
         }),
       });
@@ -71,7 +76,9 @@ function MainContent() {
       }
 
       const courseData = await response.json();
-      setCourses(courseData.filter((course: Course) => course.id !== 1)); // Exclude site course
+      // Extract courses from the response (it returns {courses: [...], nextoffset: ...})
+      const enrolledCourses = courseData.courses || [];
+      setCourses(enrolledCourses.filter((course: Course) => course.id !== 1)); // Exclude site course
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load courses');
     } finally {

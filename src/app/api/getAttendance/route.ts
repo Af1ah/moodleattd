@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get token from Authorization header
+    // Get token from Authorization header (for authentication validation)
     const authorization = request.headers.get('authorization');
     if (!authorization || !authorization.startsWith('Bearer ')) {
       return NextResponse.json(
@@ -11,6 +11,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Note: User token is validated but not used - this endpoint requires admin token
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const token = authorization.split(' ')[1];
 
     // Get query parameters
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-const admintoken = process.env.ATTD_TOCkEN;
+const admintoken = process.env.NEXT_PUBLIC_ATTD_TOKEN;
     // Build query parameters for Moodle Web Service
     const moodleParams = new URLSearchParams({
       wstoken: admintoken || '',

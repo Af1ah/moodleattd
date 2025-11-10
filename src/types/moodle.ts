@@ -88,9 +88,25 @@ export interface FieldMapping {
   totalAbsentIndex: number;
 }
 
+// Enhanced field mapping with smart header detection
+export interface SmartFieldMapping {
+  courseNameIndex: number;
+  studentNameIndex: number;
+  studentFullNameIndex: number;
+  dateTimeIndex: number;
+  statusIndex: number;
+  gradeIndex: number;
+  totalPresentIndex: number;
+  totalAbsentIndex: number;
+  totalLateIndex: number;
+  totalExcusedIndex: number;
+  takenIndex: number;
+  isSmartMapping: true; // Flag to indicate this is smart mapping
+}
+
 export interface MoodleSettings {
   baseUrl: string;
-  fieldMapping: FieldMapping;
+  fieldMapping: FieldMapping | SmartFieldMapping;
   useCourseName: boolean; // true = use course name, false = use student name
   swapFields: boolean; // swap course and student fields
   lastUpdated: number;
