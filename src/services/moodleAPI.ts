@@ -1,7 +1,8 @@
 import { 
   ListReportsResponse, 
   RetrieveReportResponse, 
-  MoodleAPIParams 
+  MoodleAPIParams,
+  GradeItemsResponse
 } from '@/types/moodle';
 
 class MoodleAPIService {
@@ -52,6 +53,18 @@ class MoodleAPIService {
   }
 
   /**
+   * Get attendance data directly from gradebook (bypasses report creation)
+   * wsfunction: gradereport_user_get_grade_items
+   */
+  async getAttendanceData(courseId: number): Promise<GradeItemsResponse> {
+    return this.makeRequest<GradeItemsResponse>({
+      wsfunction: 'gradereport_user_get_grade_items',
+      moodlewsrestformat: 'json',
+      courseid: courseId,
+    });
+  }
+
+  /**
    * Get list of available reports
    * wsfunction: core_reportbuilder_list_reports
    */
@@ -77,7 +90,6 @@ class MoodleAPIService {
       page: page,
     });
   }
-
   /**
    * Retrieve ALL pages of a report's data
    * Automatically fetches all pages based on totalrowcount

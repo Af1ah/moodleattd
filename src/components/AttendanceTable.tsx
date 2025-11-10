@@ -13,19 +13,18 @@ interface AttendanceTableProps {
   onFilteredDataChange?: (filteredData: AttendanceTableData) => void;
 }
 
-// Helper function to get current week range
+// Helper function to get current month range (default)
 const getCurrentWeekRange = (): DateRange => {
   const today = new Date();
-  const day = today.getDay();
-  const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(today.setDate(diff));
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
+  // Get first day of current month
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  // Get last day of current month
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   
   return {
-    option: 'week',
-    startDate: monday.toISOString().split('T')[0],
-    endDate: sunday.toISOString().split('T')[0],
+    option: 'month',
+    startDate: firstDay.toISOString().split('T')[0],
+    endDate: lastDay.toISOString().split('T')[0],
   };
 };
 
@@ -83,9 +82,15 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
   // State for session-based tracking
   const [sessionBasedTracking, setSessionBasedTracking] = useState(false);
 
-  // State for date range filter (default to current week)
+  // State for date range filter (default to current month)
   const [dateRange, setDateRange] = useState<DateRange>(getCurrentWeekRange());
 
+  // Update selected courses when allCourses changes (ensure all are checked by default)
+  useEffect(() => {
+    if (allCourses.length > 0) {
+      setSelectedCourses(new Set(allCourses));
+    }
+  }, [allCourses]);
  
   // Toggle course filter
   const toggleCourse = (course: string) => {
@@ -389,7 +394,7 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                     >
                       <div className="flex flex-col">
                         <span className="font-semibold">{session.time}</span>
-                        <span className="text-[10px] mt-0.5 truncate max-w-[80px]" title={session.sessionName}>
+                        <span className="text-[10px] mt-0.5 truncate max-w-20" title={session.sessionName}>
                           {session.sessionName}
                         </span>
                       </div>

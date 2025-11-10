@@ -63,6 +63,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     setToken(newToken);
     console.log('Token state updated');
+    // Explicitly redirect after successful login
+    router.push('/');
+    console.log('Redirect to home initiated');
   };
 
   const logout = async () => {

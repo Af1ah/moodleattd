@@ -27,10 +27,10 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-
+const admintoken = process.env.ATTD_TOCkEN;
     // Build query parameters for Moodle Web Service
     const moodleParams = new URLSearchParams({
-      wstoken: token,
+      wstoken: admintoken || '',
       wsfunction: 'mod_attendance_get_sessions',
       moodlewsrestformat: 'json',
     });

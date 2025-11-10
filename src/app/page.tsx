@@ -6,12 +6,21 @@ import MoodleAPIService from '@/services/moodleAPI';
 import { MoodleReport } from '@/types/moodle';
 import { ProtectedRoute, useAuth } from '@/components/AuthProvider';
 
+interface Course {
+  id: number;
+  fullname: string;
+  shortname: string;
+}
+
 function MainContent() {
   const router = useRouter();
   const { logout } = useAuth();
   const [reports, setReports] = useState<MoodleReport[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [useDirectAPI, setUseDirectAPI] = useState<boolean>(false);
+  const [isLoadingCourses, setIsLoadingCourses] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -35,6 +44,47 @@ function MainContent() {
 
     fetchReports();
   }, []);
+
+  const fetchCourses = async () => {
+    setIsLoadingCourses(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('moodleToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('/api/moodle/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          wsfunction: 'core_course_get_courses',
+          moodlewsrestformat: 'json',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch courses');
+      }
+
+      const courseData = await response.json();
+      setCourses(courseData.filter((course: Course) => course.id !== 1)); // Exclude site course
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load courses');
+    } finally {
+      setIsLoadingCourses(false);
+    }
+  };
+
+  const handleMethodToggle = async (useDirect: boolean) => {
+    setUseDirectAPI(useDirect);
+    if (useDirect && courses.length === 0) {
+      await fetchCourses();
+    }
+  };
 
   const handleReportClick = (reportId: number) => {
     router.push(`/report/${reportId}`);
@@ -80,6 +130,38 @@ function MainContent() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Method Selection Toggle */}
+        <div className="mb-8 bg-white rounded-xl shadow-md p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Attendance Method</h2>
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="method"
+                checked={!useDirectAPI}
+                onChange={() => handleMethodToggle(false)}
+                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              <div>
+                <div className="font-medium text-gray-900">Report Builder</div>
+                <div className="text-sm text-gray-500">Use custom attendance reports</div>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="method"
+                checked={useDirectAPI}
+                onChange={() => handleMethodToggle(true)}
+                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              />
+              <div>
+                <div className="font-medium text-gray-900">Direct Gradebook</div>
+                <div className="text-sm text-gray-500">Get attendance directly from course gradebook</div>
+              </div>
+            </label>
+          </div>
+        </div>
         {/* Loading State */}
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20">
@@ -113,8 +195,8 @@ function MainContent() {
           </div>
         )}
 
-        {/* Reports Grid */}
-        {!isLoading && !error && reports.length > 0 && (
+        {/* Reports Grid - Only show when using Report Builder */}
+        {!useDirectAPI && !isLoading && !error && reports.length > 0 && (
           <div>
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Available Reports</h2>
@@ -169,16 +251,76 @@ function MainContent() {
           </div>
         )}
 
+        {/* Course Selection Grid - Only show when using Direct API */}
+        {useDirectAPI && !isLoadingCourses && !error && courses.length > 0 && (
+          <div>
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Select Course</h2>
+              <p className="text-gray-600 mt-1">Choose a course to view direct attendance data from gradebook</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {courses.map((course) => (
+                <button
+                  key={course.id}
+                  onClick={() => router.push(`/report/direct/${course.id}`)}
+                  className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 text-left border-2 border-transparent hover:border-green-500 transform hover:-translate-y-1 active:scale-98"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+                      <svg className="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2 group-hover:text-green-600 transition-colors">
+                        {course.fullname}
+                      </h3>
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                        </svg>
+                        <span>{course.shortname}</span>
+                      </div>
+                    </div>
+                    <svg className="w-6 h-6 text-gray-400 group-hover:text-green-600 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Loading Courses State */}
+        {useDirectAPI && isLoadingCourses && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-green-200 border-t-green-600"></div>
+            <p className="mt-6 text-gray-600 font-medium">Loading available courses...</p>
+          </div>
+        )}
+
         {/* Empty State */}
-        {!isLoading && !error && reports.length === 0 && (
+        {!isLoading && !isLoadingCourses && !error && (
+          (!useDirectAPI && reports.length === 0) || 
+          (useDirectAPI && courses.length === 0)
+        ) && (
           <div className="max-w-2xl mx-auto text-center py-20">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Reports Available</h3>
-            <p className="text-gray-600">There are currently no attendance reports to display.</p>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {useDirectAPI ? 'No Courses Available' : 'No Reports Available'}
+            </h3>
+            <p className="text-gray-600">
+              {useDirectAPI 
+                ? 'There are currently no courses to display.'
+                : 'There are currently no attendance reports to display.'
+              }
+            </p>
           </div>
         )}
       </main>

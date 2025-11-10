@@ -117,3 +117,27 @@ export interface MoodleAPIParams {
   moodlewsrestformat: string;
   [key: string]: string | number | undefined;
 }
+
+// Gradebook/Attendance API Types
+
+export interface GradeItem {
+  id: number;
+  itemname: string;
+  graderaw: number | null;
+  gradeformatted: string;
+  grademin: number;
+  grademax: number;
+  percentageformatted?: string;
+}
+
+export interface UserGrade {
+  userid: number;
+  userfullname: string;
+  courseid: number;
+  gradeitems: GradeItem[];
+}
+
+export interface GradeItemsResponse {
+  usergrades: UserGrade[];
+  warnings?: unknown[];
+}
