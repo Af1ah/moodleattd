@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import MoodleAPIService from '@/services/moodleAPI';
-import { MoodleReport } from '@/types/moodle';
 import { ProtectedRoute, useAuth } from '@/components/AuthProvider';
 
 interface Course {
@@ -15,44 +13,41 @@ interface Course {
 function MainContent() {
   const router = useRouter();
   const { logout } = useAuth();
-  const [reports, setReports] = useState<MoodleReport[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [useDirectAPI, setUseDirectAPI] = useState<boolean>(false);
   const [isLoadingCourses, setIsLoadingCourses] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const fetchReports = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const token = localStorage.getItem('moodleToken');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
-        
-        const apiService = new MoodleAPIService(token);
-        const response = await apiService.listReports();
-        setReports(response.reports || []);
-      } catch {
-        // If listReports fails, it's likely a student without report access
-        // Redirect to student's personal attendance view
-        console.log('Reports access failed, redirecting to student attendance view');
-        router.push('/my-attendance');
-        // Don't set error here, as this is expected for students
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchReports();
-  }, [router]);
-
-  const fetchCourses = async () => {
+  const fetchCourses = async (useCache = true) => {
     setIsLoadingCourses(true);
     setError(null);
+    
     try {
+      const cacheKey = 'courses_list';
+      
+      // Check cache first
+      if (useCache) {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached);
+            const cacheAge = Date.now() - cachedData.timestamp;
+            // Use cache if less than 10 minutes old
+            if (cacheAge < 10 * 60 * 1000) {
+              console.log('✅ Using cached courses data');
+              setCourses(cachedData.courses);
+              setLastUpdated(new Date(cachedData.timestamp));
+              setIsLoadingCourses(false);
+              return;
+            }
+          } catch (e) {
+            console.warn('Failed to parse cached courses:', e);
+            localStorage.removeItem(cacheKey);
+          }
+        }
+      }
+
       const token = localStorage.getItem('moodleToken');
       if (!token) {
         throw new Error('No authentication token found');
@@ -76,26 +71,41 @@ function MainContent() {
       }
 
       const courseData = await response.json();
-      // Extract courses from the response (it returns {courses: [...], nextoffset: ...})
       const enrolledCourses = courseData.courses || [];
-      setCourses(enrolledCourses.filter((course: Course) => course.id !== 1)); // Exclude site course
+      const filteredCourses = enrolledCourses.filter((course: Course) => course.id !== 1);
+      setCourses(filteredCourses);
+      
+      const now = new Date();
+      setLastUpdated(now);
+
+      // Cache the data
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          courses: filteredCourses,
+          timestamp: now.getTime()
+        }));
+        console.log('✅ Cached courses data');
+      } catch (e) {
+        console.warn('Failed to cache courses:', e);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load courses');
     } finally {
       setIsLoadingCourses(false);
+      setIsRefreshing(false);
     }
   };
 
-  const handleMethodToggle = async (useDirect: boolean) => {
-    setUseDirectAPI(useDirect);
-    if (useDirect && courses.length === 0) {
-      await fetchCourses();
-    }
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchCourses(false); // Force refresh, skip cache
   };
 
-  const handleReportClick = (reportId: number) => {
-    router.push(`/report/${reportId}`);
-  };
+
 
   const handleLogout = async () => {
     await logout();
@@ -122,22 +132,60 @@ function MainContent() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Logout
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh courses"
+              >
+                <svg 
+                  className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Method Selection Toggle */}
+        {/* Cache Info Banner */}
+        {lastUpdated && !isLoadingCourses && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm text-blue-800">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                Data loaded from cache • Last updated: {lastUpdated.toLocaleString()}
+              </span>
+            </div>
+            <button
+              onClick={handleRefresh}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Refresh now
+            </button>
+          </div>
+        )}
+        
+        {/* Method Selection Toggle - HIDDEN TEMPORARILY
         <div className="mb-8 bg-white rounded-xl shadow-md p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Attendance Method</h2>
           <div className="flex items-center gap-6">
@@ -146,7 +194,7 @@ function MainContent() {
                 type="radio"
                 name="method"
                 checked={!useDirectAPI}
-                onChange={() => handleMethodToggle(false)}
+                onChange={() => {}}
                 className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
               />
               <div>
@@ -159,7 +207,7 @@ function MainContent() {
                 type="radio"
                 name="method"
                 checked={useDirectAPI}
-                onChange={() => handleMethodToggle(true)}
+                onChange={() => {}}
                 className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
               />
               <div>
@@ -169,13 +217,7 @@ function MainContent() {
             </label>
           </div>
         </div>
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600"></div>
-            <p className="mt-6 text-gray-600 font-medium">Loading available reports...</p>
-          </div>
-        )}
+        */}
 
         {/* Error State */}
         {error && (
@@ -202,64 +244,8 @@ function MainContent() {
           </div>
         )}
 
-        {/* Reports Grid - Only show when using Report Builder */}
-        {!useDirectAPI && !isLoading && !error && reports.length > 0 && (
-          <div>
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Available Reports</h2>
-              <p className="text-gray-600 mt-1">Click on any report to view attendance details</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {reports.map((report, index) => (
-                <button
-                  key={report.id}
-                  onClick={() => handleReportClick(report.id)}
-                  className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 text-left border-2 border-transparent hover:border-blue-500 transform hover:-translate-y-1 active:scale-98"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${
-                      index % 6 === 0 ? 'bg-blue-100' :
-                      index % 6 === 1 ? 'bg-green-100' :
-                      index % 6 === 2 ? 'bg-purple-100' :
-                      index % 6 === 3 ? 'bg-orange-100' :
-                      index % 6 === 4 ? 'bg-pink-100' :
-                      'bg-indigo-100'
-                    }`}>
-                      <svg className={`w-7 h-7 ${
-                        index % 6 === 0 ? 'text-blue-600' :
-                        index % 6 === 1 ? 'text-green-600' :
-                        index % 6 === 2 ? 'text-purple-600' :
-                        index % 6 === 3 ? 'text-orange-600' :
-                        index % 6 === 4 ? 'text-pink-600' :
-                        'text-indigo-600'
-                      }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">
-                        {report.name}
-                      </h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-                        </svg>
-                        <span>ID: {report.id}</span>
-                      </div>
-                    </div>
-                    <svg className="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Course Selection Grid - Only show when using Direct API */}
-        {useDirectAPI && !isLoadingCourses && !error && courses.length > 0 && (
+        {/* Course Selection Grid */}
+        {!isLoadingCourses && !error && courses.length > 0 && (
           <div>
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Select Course</h2>
@@ -301,7 +287,7 @@ function MainContent() {
         )}
 
         {/* Loading Courses State */}
-        {useDirectAPI && isLoadingCourses && (
+        {isLoadingCourses && (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-green-200 border-t-green-600"></div>
             <p className="mt-6 text-gray-600 font-medium">Loading available courses...</p>
@@ -309,10 +295,7 @@ function MainContent() {
         )}
 
         {/* Empty State */}
-        {!isLoading && !isLoadingCourses && !error && (
-          (!useDirectAPI && reports.length === 0) || 
-          (useDirectAPI && courses.length === 0)
-        ) && (
+        {!isLoadingCourses && !error && courses.length === 0 && (
           <div className="max-w-2xl mx-auto text-center py-20">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,13 +303,10 @@ function MainContent() {
               </svg>
             </div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {useDirectAPI ? 'No Courses Available' : 'No Reports Available'}
+              No Courses Available
             </h3>
             <p className="text-gray-600">
-              {useDirectAPI 
-                ? 'There are currently no courses to display.'
-                : 'There are currently no attendance reports to display.'
-              }
+              There are currently no courses to display.
             </p>
           </div>
         )}

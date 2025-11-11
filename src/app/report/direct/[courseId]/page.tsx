@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/AuthProvider';
 import AttendanceTable from '@/components/AttendanceTable';
@@ -182,107 +182,158 @@ function DirectAttendanceReport() {
   const [error, setError] = useState<string | null>(null);
   const [courseName, setCourseName] = useState<string>('');
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchDirectAttendance = async () => {
-      setIsLoading(true);
-      setError(null);
+  const fetchDirectAttendance = useCallback(async (useCache = true) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const cacheKey = `attendance_course_${courseId}`;
       
-      try {
-        const token = localStorage.getItem('moodleToken');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
-
-                // First get course info
-        let fetchedCourseName = '';
-        const courseResponse = await fetch('/api/moodle/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            wsfunction: 'core_course_get_enrolled_courses_by_timeline_classification',
-            classification: 'all',
-            moodlewsrestformat: 'json',
-          }),
-        });
-
-        if (courseResponse.ok) {
-          const courseData = await courseResponse.json();
-          const courses = courseData.courses || [];
-          const course = courses.find((c: {id: number; fullname: string}) => c.id === courseId);
-          if (course) {
-            fetchedCourseName = course.fullname;
-            setCourseName(course.fullname);
+      // Check cache first
+      if (useCache) {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached);
+            const cacheAge = Date.now() - cachedData.timestamp;
+            // Use cache if less than 5 minutes old
+            if (cacheAge < 5 * 60 * 1000) {
+              console.log('✅ Using cached attendance data');
+              setAttendanceData(cachedData.attendanceData);
+              setRawData(cachedData.rawData);
+              setCourseName(cachedData.courseName);
+              setValidationWarnings(cachedData.validationWarnings || []);
+              setLastUpdated(new Date(cachedData.timestamp));
+              setIsLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.warn('Failed to parse cached data:', e);
+            localStorage.removeItem(cacheKey);
           }
         }
-
-        // Get attendance sessions
-        // Note: attendanceToken will be retrieved on server-side in the API
-        const response = await fetch('/api/getAttendanceDirect', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            courseId: courseId,
-            userToken: token,  // User token for course contents
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || errorData.details || `HTTP error! status: ${response.status}`);
-        }
-
-        const sessionsResponse = await response.json();
-        
-        if (!sessionsResponse.success || !sessionsResponse.sessions) {
-          throw new Error('No attendance sessions found for this course');
-        }
-
-        // Validate the session data structure - this is for direct gradebook only
-        const validation = validateDirectAttendanceData(sessionsResponse.sessions);
-        setValidationWarnings(validation.warnings);
-        
-        if (!validation.isValid) {
-          throw new Error(`Invalid attendance data structure: ${validation.warnings.join(', ')}`);
-        }
-        
-        if (validation.warnings.length > 0) {
-          console.warn('⚠️ Direct attendance data validation warnings:', validation.warnings);
-        }
-
-        console.log(`✅ Retrieved ${sessionsResponse.totalSessions} attendance sessions`);
-
-        // Transform sessions to AttendanceTableData format using the fetched course name
-        const tableData = transformSessionsToTable(sessionsResponse.sessions, fetchedCourseName);
-        setAttendanceData(tableData);
-        
-        // Store raw data
-        setRawData({
-          success: true,
-          courseId,
-          totalStudents: tableData.students.length,
-          attendanceData: [],
-          rawResponse: sessionsResponse,
-          courseName
-        });
-
-      } catch (err) {
-        console.error('Failed to fetch direct attendance:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load attendance data');
-      } finally {
-        setIsLoading(false);
       }
-    };
 
+      const token = localStorage.getItem('moodleToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // First get course info
+      let fetchedCourseName = '';
+      const courseResponse = await fetch('/api/moodle/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          wsfunction: 'core_course_get_enrolled_courses_by_timeline_classification',
+          classification: 'all',
+          moodlewsrestformat: 'json',
+        }),
+      });
+
+      if (courseResponse.ok) {
+        const courseData = await courseResponse.json();
+        const courses = courseData.courses || [];
+        const course = courses.find((c: {id: number; fullname: string}) => c.id === courseId);
+        if (course) {
+          fetchedCourseName = course.fullname;
+          setCourseName(course.fullname);
+        }
+      }
+
+      // Get attendance sessions
+      const response = await fetch('/api/getAttendanceDirect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseId: courseId,
+          userToken: token,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || `HTTP error! status: ${response.status}`);
+      }
+
+      const sessionsResponse = await response.json();
+      
+      if (!sessionsResponse.success || !sessionsResponse.sessions) {
+        throw new Error('No attendance sessions found for this course');
+      }
+
+      // Validate the session data structure
+      const validation = validateDirectAttendanceData(sessionsResponse.sessions);
+      setValidationWarnings(validation.warnings);
+      
+      if (!validation.isValid) {
+        throw new Error(`Invalid attendance data structure: ${validation.warnings.join(', ')}`);
+      }
+      
+      if (validation.warnings.length > 0) {
+        console.warn('⚠️ Direct attendance data validation warnings:', validation.warnings);
+      }
+
+      console.log(`✅ Retrieved ${sessionsResponse.totalSessions} attendance sessions`);
+
+      // Transform sessions to AttendanceTableData format
+      const tableData = transformSessionsToTable(sessionsResponse.sessions, fetchedCourseName);
+      setAttendanceData(tableData);
+      
+      const rawDataObj = {
+        success: true,
+        courseId,
+        totalStudents: tableData.students.length,
+        attendanceData: [],
+        rawResponse: sessionsResponse,
+        courseName: fetchedCourseName
+      };
+      setRawData(rawDataObj);
+      
+      const now = new Date();
+      setLastUpdated(now);
+
+      // Cache the data
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({
+          attendanceData: tableData,
+          rawData: rawDataObj,
+          courseName: fetchedCourseName,
+          validationWarnings: validation.warnings,
+          timestamp: now.getTime()
+        }));
+        console.log('✅ Cached attendance data');
+      } catch (e) {
+        console.warn('Failed to cache data:', e);
+      }
+
+    } catch (err) {
+      console.error('Failed to fetch direct attendance:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load attendance data');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [courseId]);
+
+  useEffect(() => {
     if (courseId) {
       fetchDirectAttendance();
     }
-  }, [courseId, courseName]);
+  }, [courseId, fetchDirectAttendance]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchDirectAttendance(false); // Force refresh, skip cache
+  };
 
   const handleBack = () => {
     router.push('/');
@@ -347,14 +398,32 @@ function DirectAttendanceReport() {
                 </h1>
                 <p className="text-gray-600 mt-1">
                   {rawData ? `${rawData.totalStudents} students` : ''} • Direct from Gradebook
+                  {lastUpdated && (
+                    <span className="ml-2 text-sm text-gray-500">
+                      • Last updated: {lastUpdated.toLocaleTimeString()}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 px-3 py-1 rounded-lg">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              Direct API
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Refresh data"
+              >
+                <svg 
+                  className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
             </div>
           </div>
         </div>
@@ -391,8 +460,10 @@ function DirectAttendanceReport() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {attendanceData && (
           <>
+          {/* Attendance Table */}
+            <AttendanceTable data={attendanceData} />
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-3">
               <div className="bg-white rounded-xl shadow-md p-6">
                 <div className="flex items-center">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -438,8 +509,7 @@ function DirectAttendanceReport() {
               </div>
             </div>
 
-            {/* Attendance Table */}
-            <AttendanceTable data={attendanceData} />
+            
             
             {/* Debug Info */}
             {process.env.NODE_ENV === 'development' && rawData && (
