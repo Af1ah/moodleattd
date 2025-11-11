@@ -91,7 +91,9 @@ function transformSessionsToTable(sessions: any[], courseName: string): Attendan
       minute: '2-digit',
       hour12: true
     });
-    const sessionId = `${sessionDate}_${sessionTime}`;
+    // Use attendance activity name from API (added in backend)
+    const attendanceName = session.attendanceName || courseName;
+    const sessionId = `${sessionDate}_${sessionTime}_${attendanceName}`;
 
     // Store session info
     if (!sessionsMap.has(sessionDate)) {
@@ -101,7 +103,7 @@ function transformSessionsToTable(sessions: any[], courseName: string): Attendan
       sessionId,
       date: sessionDate,
       time: sessionTime,
-      sessionName: courseName,
+      sessionName: attendanceName,
       timestamp: session.sessdate * 1000
     });
 

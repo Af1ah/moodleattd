@@ -56,42 +56,58 @@ export async function POST(request: NextRequest) {
       throw new Error(contents.message || 'Failed to get course contents');
     }
 
-    // Find attendance activity ID
-    let attendanceId = null;
+    // Find all attendance activity IDs and names
+    const attendanceActivities: { id: number; name: string }[] = [];
     for (const section of contents) {
       if (section.modules) {
         for (const mod of section.modules) {
           if (mod.modname === 'attendance') {
-            attendanceId = mod.instance;
-            break;
+            attendanceActivities.push({
+              id: mod.instance,
+              name: mod.name || `Attendance ${mod.instance}`
+            });
           }
         }
       }
-      if (attendanceId) break;
     }
 
-    if (!attendanceId) {
+    if (attendanceActivities.length === 0) {
       throw new Error('No attendance activity found in this course');
     }
 
-    console.log(`📊 Found attendance activity ID: ${attendanceId}`);
+    console.log(`📊 Found ${attendanceActivities.length} attendance activity/activities:`, 
+      attendanceActivities.map(a => `${a.name} (ID: ${a.id})`).join(', '));
 
-    // Now get attendance sessions
-    const sessionsParams = new URLSearchParams({
-      wstoken: wstoken,
-      wsfunction: 'mod_attendance_get_sessions',
-      moodlewsrestformat: 'json',
-      attendanceid: attendanceId.toString(),
-    });
+    // Get attendance sessions from all attendance activities
+    const allSessions = [];
+    for (const activity of attendanceActivities) {
+      const sessionsParams = new URLSearchParams({
+        wstoken: wstoken,
+        wsfunction: 'mod_attendance_get_sessions',
+        moodlewsrestformat: 'json',
+        attendanceid: activity.id.toString(),
+      });
 
-    const sessionsResponse = await fetch(`${contentsUrl}?${sessionsParams.toString()}`);
-    const sessionsData = await sessionsResponse.json();
+      const sessionsResponse = await fetch(`${contentsUrl}?${sessionsParams.toString()}`);
+      const sessionsData = await sessionsResponse.json();
 
-    if (sessionsData.exception) {
-      throw new Error(sessionsData.message || 'Failed to get attendance sessions');
+      if (sessionsData.exception) {
+        console.warn(`⚠️ Failed to get sessions for attendance ${activity.name}: ${sessionsData.message}`);
+        continue;
+      }
+
+      if (Array.isArray(sessionsData) && sessionsData.length > 0) {
+        console.log(`✅ Retrieved ${sessionsData.length} sessions from attendance "${activity.name}"`);
+        // Add attendance activity name to each session
+        const sessionsWithName = sessionsData.map(session => ({
+          ...session,
+          attendanceName: activity.name
+        }));
+        allSessions.push(...sessionsWithName);
+      }
     }
 
-    console.log(`✅ Retrieved ${sessionsData.length || 0} attendance sessions`);
+    console.log(`✅ Total sessions retrieved: ${allSessions.length}`);
 
     // Return the raw sessions data
     // The frontend will transform it as needed
@@ -99,10 +115,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       courseId,
-      attendanceId,
-      totalSessions: sessionsData.length || 0,
-      sessions: sessionsData,
-      note: 'Attendance sessions from mod_attendance'
+      attendanceActivities: attendanceActivities,
+      totalAttendanceActivities: attendanceActivities.length,
+      totalSessions: allSessions.length,
+      sessions: allSessions,
+      note: 'Attendance sessions from all mod_attendance activities in course'
     });
 
   } catch (error) {
