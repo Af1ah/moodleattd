@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 
 export default function LoginPage() {
@@ -8,7 +8,39 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isLtiUser, setIsLtiUser] = useState(false);
+  const [courseInfo, setCourseInfo] = useState<string>('');
   const { login } = useAuth();
+
+  // Check if this is an LTI user and get course info
+  useEffect(() => {
+    const checkLtiContext = async () => {
+      const ltiFlag = localStorage.getItem('isLtiUser') === 'true';
+      setIsLtiUser(ltiFlag);
+      
+      if (ltiFlag) {
+        try {
+          const response = await fetch('/api/lti/session');
+          if (response.ok) {
+            const { session } = await response.json();
+            setCourseInfo(`${session.courseName} (Course ID: ${session.courseId})`);
+          }
+        } catch (err) {
+          console.error('Failed to get LTI session info:', err);
+        }
+      }
+    };
+
+    checkLtiContext();
+    
+    // Prevent browser back button cache issues
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', window.location.href);
+      window.onpopstate = function () {
+        window.history.pushState(null, '', window.location.href);
+      };
+    }
+  }, []);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -52,15 +84,42 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to Moodle Reports
+          {isLtiUser ? 'Sign in to Access Course' : 'Sign in to Moodle Reports'}
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Enter your Moodle credentials to access your attendance reports
+          {isLtiUser ? (
+            <>
+              Accessing: <span className="font-medium text-blue-600">{courseInfo}</span><br />
+              Enter your Moodle credentials to continue
+            </>
+          ) : (
+            'Enter your Moodle credentials to access your attendance reports'
+          )}
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {isLtiUser && (
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-start">
+                <div className="shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-blue-800">
+                    LTI Authentication Required
+                  </h3>
+                  <p className="mt-1 text-sm text-blue-700">
+                    You&apos;ve been redirected from Moodle. Please log in to access your course attendance report.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">
