@@ -41,14 +41,32 @@ export default function LTIAuthPage() {
         console.log('🔑 Moodle token from localStorage:', moodleToken ? 'Found' : 'Not found');
         
         if (moodleToken) {
-          // User is already authenticated, redirect to their course report
-          console.log('✅ User is authenticated, redirecting to course report');
-          router.push(`/report/direct/${courseId}`);
+          // User is already authenticated, check role and redirect accordingly
+          console.log('✅ User is authenticated, checking role...');
+          
+          // Check if user is a student
+          const { isStudent } = await import('@/utils/roleUtils');
+          const userIsStudent = isStudent(session);
+          
+          if (userIsStudent) {
+            console.log('✅ User is student, redirecting to student view');
+            router.push(`/student-attendance/${courseId}`);
+          } else {
+            console.log('✅ User is instructor, redirecting to course report');
+            router.push(`/report/direct/${courseId}`);
+          }
         } else {
           // User needs to login first, redirect to login with return URL
           console.log('❌ User not authenticated, redirecting to login');
           // Store the intended destination for after login
-          localStorage.setItem('ltiReturnUrl', `/report/direct/${courseId}`);
+          const { isStudent } = await import('@/utils/roleUtils');
+          const userIsStudent = isStudent(session);
+          
+          if (userIsStudent) {
+            localStorage.setItem('ltiReturnUrl', `/student-attendance/${courseId}`);
+          } else {
+            localStorage.setItem('ltiReturnUrl', `/report/direct/${courseId}`);
+          }
           localStorage.setItem('isLtiUser', 'true');
           router.push('/login');
         }

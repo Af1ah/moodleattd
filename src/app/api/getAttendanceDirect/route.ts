@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { courseId, userToken } = body;
+    const { courseId, userToken, filterStudentId } = body;
 
     // Get attendance token from environment (server-side only)
     const wstoken = process.env.NEXT_PUBLIC_ATTD_TOKEN;
@@ -32,6 +32,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`🎯 Getting attendance sessions from course ${courseId}...`);
+    if (filterStudentId) {
+      console.log(`🔍 Filtering for student ID: ${filterStudentId}`);
+    }
 
     // First, get course modules to find attendance activity
     const baseUrl = process.env.NEXT_PUBLIC_MOODLE_BASE_URL;
@@ -109,6 +112,24 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Total sessions retrieved: ${allSessions.length}`);
 
+    // Filter sessions for specific student if requested
+    let filteredSessions = allSessions;
+    if (filterStudentId) {
+      console.log(`🔍 Filtering sessions for student ID: ${filterStudentId}`);
+      filteredSessions = allSessions.map(session => {
+        // Only keep the specific student's data in users and attendance_log
+        const filteredUsers = session.users?.filter((user: { id: number }) => user.id.toString() === filterStudentId.toString()) || [];
+        const filteredAttendanceLog = session.attendance_log?.filter((log: { studentid: number }) => log.studentid.toString() === filterStudentId.toString()) || [];
+        
+        return {
+          ...session,
+          users: filteredUsers,
+          attendance_log: filteredAttendanceLog
+        };
+      });
+      console.log(`✅ Filtered to ${filteredSessions.length} sessions for student`);
+    }
+
     // Return the raw sessions data
     // The frontend will transform it as needed
 
@@ -117,9 +138,9 @@ export async function POST(request: NextRequest) {
       courseId,
       attendanceActivities: attendanceActivities,
       totalAttendanceActivities: attendanceActivities.length,
-      totalSessions: allSessions.length,
-      sessions: allSessions,
-      note: 'Attendance sessions from all mod_attendance activities in course'
+      totalSessions: filteredSessions.length,
+      sessions: filteredSessions,
+      note: filterStudentId ? `Attendance sessions filtered for student ID ${filterStudentId}` : 'Attendance sessions from all mod_attendance activities in course'
     });
 
   } catch (error) {
