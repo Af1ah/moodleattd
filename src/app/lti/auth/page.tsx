@@ -10,17 +10,35 @@ export default function LTIAuthPage() {
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
       try {
+        console.log('🔍 Starting LTI auth check...');
+        
+        // Add a small delay to ensure session is available
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
         // First, check if we have an LTI session
+        console.log('📞 Calling /api/lti/session...');
         const sessionResponse = await fetch('/api/lti/session');
+        
+        console.log('📊 Session response status:', sessionResponse.status);
+        console.log('📊 Session response ok:', sessionResponse.ok);
+        
         if (!sessionResponse.ok) {
-          throw new Error('No LTI session found');
+          const errorText = await sessionResponse.text();
+          console.error('❌ Session response not ok:', errorText);
+          throw new Error(`No LTI session found (${sessionResponse.status}): ${errorText}`);
         }
         
-        const { session } = await sessionResponse.json();
+        const sessionData = await sessionResponse.json();
+        console.log('✅ Session data received:', sessionData);
+        
+        const { session } = sessionData;
         const courseId = session.courseId;
+        
+        console.log('🎯 Course ID from session:', courseId);
         
         // Check if user has login token in localStorage
         const moodleToken = localStorage.getItem('moodleToken');
+        console.log('🔑 Moodle token from localStorage:', moodleToken ? 'Found' : 'Not found');
         
         if (moodleToken) {
           // User is already authenticated, redirect to their course report
@@ -36,7 +54,7 @@ export default function LTIAuthPage() {
         }
       } catch (err) {
         console.error('LTI auth check failed:', err);
-        setError('Failed to process LTI authentication. Please try again.');
+        setError(`Failed to process LTI authentication: ${err instanceof Error ? err.message : String(err)}`);
       }
     };
 
@@ -54,19 +72,32 @@ export default function LTIAuthPage() {
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Authentication Error</h2>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => {
-              // Try to go back to Moodle
-              if (window.opener) {
-                window.close();
-              } else {
-                window.location.href = '/';
-              }
-            }}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Go Back
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => {
+                // Clear any stored data and try to reload
+                localStorage.removeItem('isLtiUser');
+                localStorage.removeItem('ltiReturnUrl');
+                window.location.reload();
+              }}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => {
+                // Try to go back to Moodle
+                if (window.opener) {
+                  window.close();
+                } else {
+                  window.location.href = '/';
+                }
+              }}
+              className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -78,6 +78,10 @@ export async function POST(request: NextRequest) {
     await createLTISession(sessionData);
 
     console.log('\n✅ Session created successfully!');
+    
+    // Add a small delay to ensure session is properly saved
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     console.log('🔄 Redirecting to /lti/auth');
     console.log('========================================\n');
 
