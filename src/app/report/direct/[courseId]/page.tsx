@@ -247,17 +247,28 @@ function DirectAttendanceReport() {
         }
       }
 
-      // Get attendance sessions
-      const response = await fetch('/api/getAttendanceDirect', {
+      // Get attendance sessions from database (faster) - NEW METHOD
+      const response = await fetch('/api/getAttendanceDB', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           courseId: courseId,
-          userToken: token,
         }),
       });
+      
+      // OLD METHOD (commented out - using Moodle API)
+      // const response = await fetch('/api/getAttendanceDirect', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify({
+      //     courseId: courseId,
+      //     userToken: token,
+      //   }),
+      // });
 
       if (!response.ok) {
         const errorData = await response.json();

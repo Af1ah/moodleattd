@@ -1,0 +1,186 @@
+// Prisma schema for Moodle attendance tables
+// Database connection string should be set in .env as DATABASE_URL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Attendance activity/module
+model mdl_attendance {
+  id                   BigInt   @id @default(autoincrement())
+  course               BigInt   @default(0)
+  name                 String?  @db.VarChar(255)
+  grade                BigInt   @default(100)
+  timemodified         BigInt   @default(0)
+  intro                String?  @db.Text
+  introformat          Int      @default(0) @db.SmallInt
+  subnet               String?  @db.VarChar(255)
+  sessiondetailspos    String   @default("left") @db.VarChar(5)
+  showsessiondetails   Int      @default(1) @db.SmallInt
+  showextrauserdetails Int      @default(1) @db.SmallInt
+
+  sessions mdl_attendance_sessions[]
+  statuses mdl_attendance_statuses[]
+
+  @@map("mdl_attendance")
+  @@index([course], name: "mdl_atte_cou_ix")
+}
+
+// Attendance log - records student attendance for each session
+model mdl_attendance_log {
+  id        BigInt  @id @default(autoincrement())
+  sessionid BigInt  @default(0)
+  studentid BigInt  @default(0)
+  statusid  BigInt  @default(0)
+  statusset String? @db.VarChar(1333)
+  timetaken BigInt  @default(0)
+  takenby   BigInt  @default(0)
+  remarks   String? @db.VarChar(1333)
+  ipaddress String  @default("") @db.VarChar(45)
+
+  session mdl_attendance_sessions @relation(fields: [sessionid], references: [id])
+  status  mdl_attendance_statuses @relation(fields: [statusid], references: [id])
+
+  @@map("mdl_attendance_log")
+  @@index([sessionid], name: "mdl_attelog_ses_ix")
+  @@index([statusid], name: "mdl_attelog_sta_ix")
+  @@index([studentid], name: "mdl_attelog_stu_ix")
+}
+
+// Attendance sessions - individual class meetings
+model mdl_attendance_sessions {
+  id                    BigInt  @id @default(autoincrement())
+  attendanceid          BigInt  @default(0)
+  groupid               BigInt  @default(0)
+  sessdate              BigInt  @default(0)
+  duration              BigInt  @default(0)
+  lasttaken             BigInt?
+  lasttakenby           BigInt  @default(0)
+  timemodified          BigInt?
+  description           String  @default("") @db.Text
+  descriptionformat     Int     @default(0) @db.SmallInt
+  studentscanmark       Int     @default(0) @db.SmallInt
+  allowupdatestatus     Int     @default(0) @db.SmallInt
+  studentsearlyopentime BigInt  @default(0)
+  autoassignstatus      Int     @default(0) @db.SmallInt
+  studentpassword       String  @default("") @db.VarChar(50)
+  subnet                String? @db.VarChar(255)
+  automark              Int     @default(0) @db.SmallInt
+  automarkcompleted     Int     @default(0) @db.SmallInt
+  statusset             Int     @default(0)
+  absenteereport        Int     @default(1) @db.SmallInt
+  preventsharedip       Int     @default(0) @db.SmallInt
+  preventsharediptime   BigInt?
+  caleventid            BigInt  @default(0)
+  calendarevent         Int     @default(1) @db.SmallInt
+  includeqrcode         Int     @default(0) @db.SmallInt
+  rotateqrcode          Int     @default(0) @db.SmallInt
+  rotateqrcodesecret    String? @db.VarChar(10)
+  automarkcmid          BigInt? @default(0)
+
+  attendance mdl_attendance         @relation(fields: [attendanceid], references: [id])
+  logs       mdl_attendance_log[]
+
+  @@map("mdl_attendance_sessions")
+  @@index([attendanceid], name: "mdl_attesess_att_ix")
+  @@index([groupid], name: "mdl_attesess_gro_ix")
+  @@index([sessdate], name: "mdl_attesess_ses_ix")
+  @@index([caleventid], name: "mdl_attesess_cal_ix")
+}
+
+// Attendance statuses - Present, Absent, Late, Excused, etc.
+model mdl_attendance_statuses {
+  id                     BigInt   @id @default(autoincrement())
+  attendanceid           BigInt   @default(0)
+  acronym                String   @default("") @db.VarChar(2)
+  description            String   @default("") @db.VarChar(30)
+  grade                  Decimal  @default(0) @db.Decimal(5, 2)
+  studentavailability    BigInt?
+  availablebeforesession Int?     @db.SmallInt
+  setunmarked            Int?     @db.SmallInt
+  visible                Int      @default(1) @db.SmallInt
+  deleted                Int      @default(0) @db.SmallInt
+  setnumber              Int      @default(0)
+
+  attendance mdl_attendance        @relation(fields: [attendanceid], references: [id])
+  logs       mdl_attendance_log[]
+
+  @@map("mdl_attendance_statuses")
+  @@index([attendanceid], name: "mdl_attestat_att_ix")
+  @@index([deleted], name: "mdl_attestat_del_ix")
+  @@index([visible], name: "mdl_attestat_vis_ix")
+}
+
+// Moodle users
+model mdl_user {
+  id                BigInt  @id @default(autoincrement())
+  auth              String  @default("manual") @db.VarChar(20)
+  confirmed         Int     @default(0) @db.SmallInt
+  policyagreed      Int     @default(0) @db.SmallInt
+  deleted           Int     @default(0) @db.SmallInt
+  suspended         Int     @default(0) @db.SmallInt
+  mnethostid        BigInt  @default(0)
+  username          String  @default("") @db.VarChar(100)
+  password          String  @default("") @db.VarChar(255)
+  idnumber          String  @default("") @db.VarChar(255)
+  firstname         String  @default("") @db.VarChar(100)
+  lastname          String  @default("") @db.VarChar(100)
+  email             String  @default("") @db.VarChar(100)
+  emailstop         Int     @default(0) @db.SmallInt
+  phone1            String  @default("") @db.VarChar(20)
+  phone2            String  @default("") @db.VarChar(20)
+  institution       String  @default("") @db.VarChar(255)
+  department        String  @default("") @db.VarChar(255)
+  address           String  @default("") @db.VarChar(255)
+  city              String  @default("") @db.VarChar(120)
+  country           String  @default("") @db.VarChar(2)
+  lang              String  @default("en") @db.VarChar(30)
+  calendartype      String  @default("gregorian") @db.VarChar(30)
+  theme             String  @default("") @db.VarChar(50)
+  timezone          String  @default("99") @db.VarChar(100)
+  firstaccess       BigInt  @default(0)
+  lastaccess        BigInt  @default(0)
+  lastlogin         BigInt  @default(0)
+  currentlogin      BigInt  @default(0)
+  lastip            String  @default("") @db.VarChar(45)
+  secret            String  @default("") @db.VarChar(15)
+  picture           BigInt  @default(0)
+  description       String? @db.Text
+  descriptionformat Int     @default(1) @db.SmallInt
+  mailformat        Int     @default(1) @db.SmallInt
+  maildigest        Int     @default(0) @db.SmallInt
+  maildisplay       Int     @default(2) @db.SmallInt
+  autosubscribe     Int     @default(1) @db.SmallInt
+  trackforums       Int     @default(0) @db.SmallInt
+  timecreated       BigInt  @default(0)
+  timemodified      BigInt  @default(0)
+  trustbitmask      BigInt  @default(0)
+  imagealt          String? @db.VarChar(255)
+  lastnamephonetic  String? @db.VarChar(255)
+  firstnamephonetic String? @db.VarChar(255)
+  middlename        String? @db.VarChar(255)
+  alternatename     String? @db.VarChar(255)
+  moodlenetprofile  String? @db.VarChar(255)
+
+  @@map("mdl_user")
+  @@unique([mnethostid, username], name: "mdl_user_mneuse_uix")
+  @@index([auth], name: "mdl_user_aut_ix")
+  @@index([confirmed], name: "mdl_user_con_ix")
+  @@index([deleted], name: "mdl_user_del_ix")
+  @@index([firstname], name: "mdl_user_fir_ix")
+  @@index([lastname], name: "mdl_user_las_ix")
+  @@index([city], name: "mdl_user_cit_ix")
+  @@index([country], name: "mdl_user_cou_ix")
+  @@index([email], name: "mdl_user_ema_ix")
+  @@index([idnumber], name: "mdl_user_idn_ix")
+  @@index([lastaccess], name: "mdl_user_las2_ix")
+  @@index([alternatename], name: "mdl_user_alt_ix")
+  @@index([firstnamephonetic], name: "mdl_user_fir2_ix")
+  @@index([lastnamephonetic], name: "mdl_user_las3_ix")
+  @@index([middlename], name: "mdl_user_mid_ix")
+}

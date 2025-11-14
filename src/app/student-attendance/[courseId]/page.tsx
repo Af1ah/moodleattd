@@ -99,18 +99,30 @@ function StudentAttendancePage() {
         return;
       }
 
-      // Get attendance data from the existing API with student filter
-      const response = await fetch('/api/getAttendanceDirect', {
+      // Get attendance data from database (faster) - NEW METHOD
+      const response = await fetch('/api/getAttendanceDB', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           courseId: parseInt(courseId),
-          userToken: userToken,
           filterStudentId: session.userId, // Filter for current student only
         }),
       });
+      
+      // OLD METHOD (commented out - using Moodle API)
+      // const response = await fetch('/api/getAttendanceDirect', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify({
+      //     courseId: parseInt(courseId),
+      //     userToken: userToken,
+      //     filterStudentId: session.userId,
+      //   }),
+      // });
 
       if (!response.ok) {
         throw new Error('Failed to fetch attendance data');
@@ -290,6 +302,88 @@ function StudentAttendancePage() {
     );
   }
 
+  // Apply date range filtering to attendance data
+  const getFilteredAttendanceData = () => {
+    if (!attendanceData) return null;
+
+    // Filter session dates based on date range
+    const filteredSessionDates = attendanceData.sessionDates.filter((date) => {
+      const sessionDate = new Date(date);
+      const startDate = new Date(dateRange.startDate);
+      const endDate = new Date(dateRange.endDate);
+      return sessionDate >= startDate && sessionDate <= endDate;
+    });
+
+    // If hiding non-taken days, only show dates that have at least one session
+    const visibleSessionDates = hideNonTakenSessions 
+      ? filteredSessionDates.filter((date) => {
+          return attendanceData.attendanceActivities.some(activity => 
+            attendanceData.attendanceMatrix[activity]?.[date]?.length > 0
+          );
+        })
+      : filteredSessionDates;
+
+    // Rebuild attendance matrix with filtered dates
+    const filteredAttendanceMatrix: { [activityName: string]: { [date: string]: StudentAttendanceSession[] } } = {};
+    let filteredTotalPresent = 0;
+    let filteredTotalAbsent = 0;
+    let filteredTotalLate = 0;
+    let filteredTotalExcused = 0;
+    let filteredTotalSessions = 0;
+
+    attendanceData.attendanceActivities.forEach((activity) => {
+      filteredAttendanceMatrix[activity] = {};
+      visibleSessionDates.forEach((date) => {
+        const sessions = attendanceData.attendanceMatrix[activity]?.[date] || [];
+        if (sessions.length > 0) {
+          filteredAttendanceMatrix[activity][date] = sessions;
+          
+          // Count attendance for filtered sessions
+          sessions.forEach((session) => {
+            filteredTotalSessions++;
+            switch (session.status) {
+              case 'P': filteredTotalPresent++; break;
+              case 'A': filteredTotalAbsent++; break;
+              case 'L': filteredTotalLate++; break;
+              case 'E': filteredTotalExcused++; break;
+            }
+          });
+        } else if (!hideNonTakenSessions) {
+          // Include empty days if not hiding them
+          filteredAttendanceMatrix[activity][date] = [];
+        }
+      });
+    });
+
+    const filteredAttendancePercentage = filteredTotalSessions > 0 
+      ? Math.round((filteredTotalPresent / filteredTotalSessions) * 100) 
+      : 0;
+
+    return {
+      ...attendanceData,
+      sessionDates: visibleSessionDates,
+      attendanceMatrix: filteredAttendanceMatrix,
+      totalPresent: filteredTotalPresent,
+      totalAbsent: filteredTotalAbsent,
+      totalLate: filteredTotalLate,
+      totalExcused: filteredTotalExcused,
+      totalSessions: filteredTotalSessions,
+      attendancePercentage: filteredAttendancePercentage,
+    };
+  };
+
+  const filteredAttendanceData = getFilteredAttendanceData();
+
+  if (!filteredAttendanceData) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center">
+        <div className="text-center text-gray-500">
+          <p>No attendance data available for the selected date range</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-blue-50">
@@ -305,7 +399,7 @@ function StudentAttendancePage() {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">My Attendance Register</h1>
                 <p className="text-gray-600 mt-1">
-                  {attendanceData.courseName} • {attendanceData.studentName}
+                  {filteredAttendanceData.courseName} • {filteredAttendanceData.studentName}
                 </p>
               </div>
             </div>
@@ -332,7 +426,7 @@ function StudentAttendancePage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Present</p>
-                  <p className="text-2xl font-bold text-green-600">{attendanceData.totalPresent}</p>
+                  <p className="text-2xl font-bold text-green-600">{filteredAttendanceData.totalPresent}</p>
                 </div>
               </div>
             </div>
@@ -346,7 +440,7 @@ function StudentAttendancePage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Absent</p>
-                  <p className="text-2xl font-bold text-red-600">{attendanceData.totalAbsent}</p>
+                  <p className="text-2xl font-bold text-red-600">{filteredAttendanceData.totalAbsent}</p>
                 </div>
               </div>
             </div>
@@ -360,7 +454,7 @@ function StudentAttendancePage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Late</p>
-                  <p className="text-2xl font-bold text-yellow-600">{attendanceData.totalLate}</p>
+                  <p className="text-2xl font-bold text-yellow-600">{filteredAttendanceData.totalLate}</p>
                 </div>
               </div>
             </div>
@@ -374,7 +468,7 @@ function StudentAttendancePage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Excused</p>
-                  <p className="text-2xl font-bold text-blue-600">{attendanceData.totalExcused}</p>
+                  <p className="text-2xl font-bold text-blue-600">{filteredAttendanceData.totalExcused}</p>
                 </div>
               </div>
             </div>
@@ -388,7 +482,7 @@ function StudentAttendancePage() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Attendance</p>
-                  <p className="text-2xl font-bold text-purple-600">{attendanceData.attendancePercentage}%</p>
+                  <p className="text-2xl font-bold text-purple-600">{filteredAttendanceData.attendancePercentage}%</p>
                 </div>
               </div>
             </div>
@@ -399,7 +493,7 @@ function StudentAttendancePage() {
             <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Attendance Register</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Showing {selectedActivities.size} activities across {attendanceData.sessionDates.length} dates
+                Showing {selectedActivities.size} activities across {filteredAttendanceData.sessionDates.length} dates
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -409,7 +503,7 @@ function StudentAttendancePage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200">
                       Activity
                     </th>
-                    {attendanceData.sessionDates.map((date) => (
+                    {filteredAttendanceData.sessionDates.map((date) => (
                       <th key={date} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-20">
                         <div className="flex flex-col">
                           <span>{new Date(date).toLocaleDateString('en-US', { month: 'short' })}</span>
@@ -421,7 +515,7 @@ function StudentAttendancePage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {attendanceData.attendanceActivities
+                  {filteredAttendanceData.attendanceActivities
                     .filter(activity => selectedActivities.has(activity))
                     .map((activity, index) => (
                     <tr key={activity} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
@@ -430,8 +524,8 @@ function StudentAttendancePage() {
                           {activity}
                         </div>
                       </td>
-                      {attendanceData.sessionDates.map((date) => {
-                        const sessions = attendanceData.attendanceMatrix[activity]?.[date] || [];
+                      {filteredAttendanceData.sessionDates.map((date) => {
+                        const sessions = filteredAttendanceData.attendanceMatrix[activity]?.[date] || [];
                         
                         if (sessions.length === 0) {
                           // No sessions for this activity on this date

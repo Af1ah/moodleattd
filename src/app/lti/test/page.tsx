@@ -191,18 +191,6 @@ function LTITestPage() {
         }
         const data = await response.json();
         setLtiSession(data.session);
-        
-        // Check user role and show role information
-        const { isStudent, isInstructor, getPrimaryRole } = await import('@/utils/roleUtils');
-        const userIsStudent = isStudent(data.session);
-        const userIsInstructor = isInstructor(data.session);
-        const primaryRole = getPrimaryRole(data.session);
-        
-        console.log('🔍 Role Check Results:');
-        console.log('  - Is Student:', userIsStudent);
-        console.log('  - Is Instructor:', userIsInstructor);
-        console.log('  - Primary Role:', primaryRole);
-        console.log('  - Roles:', data.session.roles);
       } catch (err) {
         setError('Failed to load LTI session data. Please access this page through LTI launch.');
         console.error('LTI session error:', err);
