@@ -9,7 +9,7 @@ New API endpoint `/api/getAttendanceDB` fetches attendance data directly from Po
 ### Step 1: Add Database URL to .env
 
 ```bash
-DATABASE_URL="postgresql://postgres:235245@localhost:5432/moodle"
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/moodle"
 ```
 
 ### Step 2: Generate Prisma Client

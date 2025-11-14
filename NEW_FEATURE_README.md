@@ -9,7 +9,7 @@ A new high-performance attendance data fetching system has been added that queri
 ### 1. Add Database URL to `.env.local`
 
 ```bash
-DATABASE_URL="postgresql://postgres:235245@localhost:5432/moodle"
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/moodle"
 ```
 
 ### 2. Generate Prisma Client (Already Done ✅)

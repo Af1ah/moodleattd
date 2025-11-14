@@ -34,7 +34,7 @@
 ### ⏳ Configuration (Required)
 - [ ] Add `DATABASE_URL` to your `.env.local` file
   ```bash
-  DATABASE_URL="postgresql://postgres:235245@localhost:5432/moodle"
+  DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/moodle"
   ```
 
 ### ⏳ Testing (Recommended)
@@ -103,7 +103,7 @@ POST /api/getAttendanceDB
 
 ### Environment Variable
 ```bash
-DATABASE_URL="postgresql://postgres:235245@localhost:5432/moodle"
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/moodle"
 ```
 
 ### Test Command

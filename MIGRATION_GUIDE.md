@@ -80,7 +80,7 @@ Only difference: Database response includes `"dataSource": "database"`
 
 Add to `.env.local`:
 ```env
-DATABASE_URL="postgresql://postgres:235245@localhost:5432/moodle"
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/moodle"
 ```
 
 ### Step 2: Generate Prisma Client

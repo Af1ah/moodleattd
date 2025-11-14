@@ -184,3 +184,38 @@ model mdl_user {
   @@index([lastnamephonetic], name: "mdl_user_las3_ix")
   @@index([middlename], name: "mdl_user_mid_ix")
 }
+
+// Cohort (group of students)
+model mdl_cohort {
+  id                BigInt   @id @default(autoincrement())
+  contextid         BigInt
+  name              String   @db.VarChar(254)
+  idnumber          String?  @db.VarChar(100)
+  description       String?  @db.Text
+  descriptionformat Int      @db.SmallInt
+  visible           Int      @default(1) @db.SmallInt
+  component         String   @default("") @db.VarChar(100)
+  timecreated       BigInt
+  timemodified      BigInt
+  theme             String?  @db.VarChar(50)
+
+  members mdl_cohort_members[]
+
+  @@map("mdl_cohort")
+  @@index([contextid], name: "mdl_coho_con_ix")
+}
+
+// Cohort members (students in a cohort)
+model mdl_cohort_members {
+  id        BigInt @id @default(autoincrement())
+  cohortid  BigInt @default(0)
+  userid    BigInt @default(0)
+  timeadded BigInt @default(0)
+
+  cohort mdl_cohort @relation(fields: [cohortid], references: [id])
+
+  @@map("mdl_cohort_members")
+  @@unique([cohortid, userid], name: "mdl_cohomemb_cohuse_uix")
+  @@index([cohortid], name: "mdl_cohomemb_coh_ix")
+  @@index([userid], name: "mdl_cohomemb_use_ix")
+}

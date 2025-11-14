@@ -67,7 +67,7 @@ A new database-direct attendance fetching system has been implemented that fetch
 Add to your `.env.local`:
 
 ```bash
-DATABASE_URL="postgresql://postgres:235245@localhost:5432/moodle"
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/moodle"
 ```
 
 ## API Usage
