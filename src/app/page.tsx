@@ -346,6 +346,33 @@ function MainContent() {
           </div>
         )}
 
+        {/* All Courses Report Button - For Students */}
+        {!isLoadingCourses && !error && role?.roleShortname === 'student' && (
+          <div className="mb-8">
+            <div className="max-w-md mx-auto">
+              <button
+                onClick={() => router.push('/student-all-courses')}
+                className="group w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-8 text-center border-2 border-transparent transform hover:-translate-y-1 active:scale-98"
+              >
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-white bg-opacity-20 flex items-center justify-center">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold mb-2">📚 All Courses Report</h3>
+                    <p className="text-blue-100">View your attendance across all enrolled courses</p>
+                  </div>
+                  <svg className="w-6 h-6 text-white group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Course Selection Grid */}
         {!isLoadingCourses && !error && courses.length > 0 && (
           <div>
