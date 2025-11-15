@@ -10,6 +10,16 @@ interface Course {
   shortname: string;
 }
 
+interface Cohort {
+  id: number;
+  name: string;
+  idnumber?: string;
+  description?: string;
+  contextid?: number;
+  timecreated?: number;
+  timemodified?: number;
+}
+
 function MainContent() {
   const router = useRouter();
   const { logout, role, userId } = useAuth();
@@ -18,7 +28,7 @@ function MainContent() {
   const [isLoadingCourses, setIsLoadingCourses] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [userCohorts, setUserCohorts] = useState<number[]>([]);
+  const [userCohorts, setUserCohorts] = useState<Cohort[]>([]);
   
   const isManager = role?.roleShortname === 'manager';
   const hasNonStudentRole = role?.roleShortname !== 'student';
@@ -115,9 +125,8 @@ function MainContent() {
       const response = await fetch(`/api/getCohorts?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
-        const cohortIds = (data.cohorts || []).map((c: { id: number }) => c.id);
-        setUserCohorts(cohortIds);
-        console.log(`✅ User has ${cohortIds.length} assigned cohorts`);
+        setUserCohorts(data.cohorts || []);
+        console.log(`✅ User has ${(data.cohorts || []).length} assigned cohorts`);
       }
     } catch (err) {
       console.warn('Failed to fetch user cohorts:', err);
@@ -290,30 +299,50 @@ function MainContent() {
           </div>
         )}
 
-        {/* Quick Actions - Cohort Report */}
+        {/* Class Based Reports - Individual Cohort Buttons */}
         {!isLoadingCourses && !error && hasNonStudentRole && hasAssignedCohorts && (
           <div className="mb-8">
-            <button
-              onClick={() => router.push('/report/cohort')}
-              className="group w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 text-left transform hover:-translate-y-1"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-white bg-opacity-20 flex items-center justify-center shrink-0">
-                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            <div className="mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Class Based Reports</h2>
+              <p className="text-gray-600 mt-1">View attendance reports for your assigned cohorts</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {userCohorts.map((cohort) => (
+                <button
+                  key={cohort.id}
+                  onClick={() => router.push(`/report/cohort/${cohort.id}`)}
+                  className="group bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 p-6 text-left border-2 border-transparent hover:border-purple-500 transform hover:-translate-y-1 active:scale-98"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                      <svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-lg mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
+                        {cohort.name}
+                      </h3>
+                      {cohort.idnumber && (
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                          </svg>
+                          <span>{cohort.idnumber}</span>
+                        </div>
+                      )}
+                      <div className="text-sm text-gray-400">
+                        Class Attendance Report
+                      </div>
+                    </div>
+                    <svg className="w-6 h-6 text-gray-400 group-hover:text-purple-600 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-xl mb-1">Cohort Attendance Reports</h3>
-                    <p className="text-white text-opacity-90">View consolidated attendance for your assigned cohorts ({userCohorts.length} available)</p>
-                  </div>
-                </div>
-                <svg className="w-8 h-8 text-white group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </button>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
