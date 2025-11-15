@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute, useAuth } from '@/components/AuthProvider';
 
@@ -12,12 +12,17 @@ interface Course {
 
 function MainContent() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, role, userId } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoadingCourses, setIsLoadingCourses] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [userCohorts, setUserCohorts] = useState<number[]>([]);
+  
+  const isManager = role?.roleShortname === 'manager';
+  const hasNonStudentRole = role?.roleShortname !== 'student';
+  const hasAssignedCohorts = userCohorts.length > 0;
 
   const fetchCourses = async (useCache = true) => {
     setIsLoadingCourses(true);
@@ -96,9 +101,38 @@ function MainContent() {
     }
   };
 
+  // Fetch user's assigned cohorts
+  const fetchUserCohorts = useCallback(async () => {
+    if (!userId || !role || role.roleShortname === 'student') {
+      return; // Skip for students or if no user info
+    }
+
+    try {
+      const params = new URLSearchParams();
+      params.append('userId', userId.toString());
+      params.append('roleShortname', role.roleShortname);
+
+      const response = await fetch(`/api/getCohorts?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        const cohortIds = (data.cohorts || []).map((c: { id: number }) => c.id);
+        setUserCohorts(cohortIds);
+        console.log(`✅ User has ${cohortIds.length} assigned cohorts`);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch user cohorts:', err);
+    }
+  }, [userId, role]);
+
   useEffect(() => {
     fetchCourses();
   }, []);
+
+  useEffect(() => {
+    if (userId && role) {
+      fetchUserCohorts();
+    }
+  }, [userId, role, fetchUserCohorts]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -133,6 +167,18 @@ function MainContent() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {isManager && (
+                <button
+                  onClick={() => router.push('/admin/cohort-assignments')}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                  title="Manage cohort assignments"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                  </svg>
+                  Admin
+                </button>
+              )}
               <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
@@ -245,11 +291,11 @@ function MainContent() {
         )}
 
         {/* Quick Actions - Cohort Report */}
-        {!isLoadingCourses && !error && (
+        {!isLoadingCourses && !error && hasNonStudentRole && hasAssignedCohorts && (
           <div className="mb-8">
             <button
               onClick={() => router.push('/report/cohort')}
-              className="group w-full bg-white text-black rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 text-left transform hover:-translate-y-1"
+              className="group w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-6 text-left transform hover:-translate-y-1"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -259,8 +305,8 @@ function MainContent() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-bold text-xl mb-1">Cohort Attendance Report</h3>
-                    <p className="text-white text-opacity-90">View consolidated attendance for entire class/batch across all courses</p>
+                    <h3 className="font-bold text-xl mb-1">Cohort Attendance Reports</h3>
+                    <p className="text-white text-opacity-90">View consolidated attendance for your assigned cohorts ({userCohorts.length} available)</p>
                   </div>
                 </div>
                 <svg className="w-8 h-8 text-white group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">

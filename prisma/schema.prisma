@@ -219,3 +219,59 @@ model mdl_cohort_members {
   @@index([cohortid], name: "mdl_cohomemb_coh_ix")
   @@index([userid], name: "mdl_cohomemb_use_ix")
 }
+
+// Moodle roles
+model mdl_role {
+  id          BigInt  @id @default(autoincrement())
+  name        String  @default("") @db.VarChar(255)
+  shortname   String  @db.VarChar(100)
+  description String  @default("") @db.Text
+  sortorder   BigInt  @default(0)
+  archetype   String  @default("") @db.VarChar(30)
+
+  assignments mdl_role_assignments[]
+
+  @@map("mdl_role")
+  @@unique([shortname], name: "mdl_role_sho_uix")
+  @@unique([sortorder], name: "mdl_role_sor_uix")
+}
+
+// Role assignments (which user has which role in which context)
+model mdl_role_assignments {
+  id           BigInt  @id @default(autoincrement())
+  roleid       BigInt  @default(0)
+  contextid    BigInt  @default(0)
+  userid       BigInt  @default(0)
+  timemodified BigInt  @default(0)
+  modifierid   BigInt  @default(0)
+  component    String  @default("") @db.VarChar(100)
+  itemid       BigInt  @default(0)
+  sortorder    BigInt  @default(0)
+
+  role mdl_role @relation(fields: [roleid], references: [id])
+
+  @@map("mdl_role_assignments")
+  @@index([roleid], name: "mdl_roleassi_rol_ix")
+  @@index([contextid], name: "mdl_roleassi_con_ix")
+  @@index([userid], name: "mdl_roleassi_use_ix")
+  @@index([roleid, contextid], name: "mdl_roleassi_rolcon_ix")
+  @@index([component, itemid, userid], name: "mdl_roleassi_comiteuse_ix")
+  @@index([sortorder], name: "mdl_roleassi_sor_ix")
+}
+
+// Custom table: Cohort assignments for non-student roles (teachers, managers, etc.)
+// This allows teachers/managers to access specific cohorts
+model mdl_cohort_role_assignments {
+  id           BigInt   @id @default(autoincrement())
+  cohortid     BigInt
+  userid       BigInt
+  roleid       BigInt
+  timeassigned BigInt
+  assignedby   BigInt
+  
+  @@map("mdl_cohort_role_assignments")
+  @@unique([cohortid, userid], name: "mdl_cohoroleass_cohuse_uix")
+  @@index([cohortid], name: "mdl_cohoroleass_coh_ix")
+  @@index([userid], name: "mdl_cohoroleass_use_ix")
+  @@index([roleid], name: "mdl_cohoroleass_rol_ix")
+}

@@ -3,11 +3,19 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
+interface RoleInfo {
+  roleId: number;
+  roleName: string;
+  roleShortname: string;
+}
+
 interface AuthContextType {
   token: string | null;
+  userId: number | null;
+  role: RoleInfo | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string) => void;
+  login: (token: string, userId?: number, role?: RoleInfo) => void;
   logout: () => Promise<void>;
 }
 
@@ -19,6 +27,8 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [role, setRole] = useState<RoleInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
@@ -29,8 +39,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Check for existing token on mount (only on client side)
     if (typeof window !== 'undefined') {
       const storedToken = localStorage.getItem('moodleToken');
+      const storedUserId = localStorage.getItem('moodleUserId');
+      const storedRole = localStorage.getItem('moodleRole');
+      
       if (storedToken) {
         setToken(storedToken);
+      }
+      if (storedUserId) {
+        setUserId(parseInt(storedUserId));
+      }
+      if (storedRole) {
+        try {
+          setRole(JSON.parse(storedRole));
+        } catch (e) {
+          console.error('Error parsing stored role:', e);
+        }
       }
     }
     setIsLoading(false);
@@ -67,14 +90,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [isAuthenticated, isLoading, pathname, router, token]);
 
-  const login = (newToken: string) => {
+  const login = (newToken: string, newUserId?: number, newRole?: RoleInfo) => {
     console.log('Login function called with token:', newToken);
     if (typeof window !== 'undefined') {
       localStorage.setItem('moodleToken', newToken);
-      console.log('Token stored in localStorage');
+      if (newUserId) {
+        localStorage.setItem('moodleUserId', newUserId.toString());
+      }
+      if (newRole) {
+        localStorage.setItem('moodleRole', JSON.stringify(newRole));
+      }
+      console.log('Token and user info stored in localStorage');
     }
     setToken(newToken);
-    console.log('Token state updated');
+    setUserId(newUserId || null);
+    setRole(newRole || null);
+    console.log('Token and user state updated');
     
     // Check if this is an LTI user
     const isLtiUser = typeof window !== 'undefined' ? localStorage.getItem('isLtiUser') === 'true' : false;
@@ -110,13 +141,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Clear local storage and state
     if (typeof window !== 'undefined') {
       localStorage.removeItem('moodleToken');
+      localStorage.removeItem('moodleUserId');
+      localStorage.removeItem('moodleRole');
     }
     setToken(null);
+    setUserId(null);
+    setRole(null);
     router.push('/login');
   };
 
   const value = {
     token,
+    userId,
+    role,
     isAuthenticated,
     isLoading,
     login,

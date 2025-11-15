@@ -64,8 +64,8 @@ export default function LoginPage() {
 
       if (response.ok && data.token) {
         console.log('Login successful, calling login function');
-        // Use the login function from AuthProvider
-        login(data.token);
+        // Use the login function from AuthProvider with role info
+        login(data.token, data.userId, data.role);
         console.log('Login function completed');
         // Router push will be handled by AuthProvider
       } else {

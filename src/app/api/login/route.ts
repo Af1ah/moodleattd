@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getUserRole } from '@/services/roleService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,11 +68,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return the token to the frontend
-    console.log('Login successful, returning token');
+    // Fetch user information from Moodle to get user ID
+    let userId: number | null = null;
+    let userRole: { roleId: number; roleName: string; roleShortname: string; roleArchetype: string } | null = null;
+    
+    try {
+      const siteInfoUrl = `${baseUrl}/webservice/rest/server.php?wstoken=${data.token}&wsfunction=core_webservice_get_site_info&moodlewsrestformat=json`;
+      const siteInfoResponse = await fetch(siteInfoUrl);
+      const siteInfo = await siteInfoResponse.json();
+      
+      if (siteInfo.userid) {
+        userId = siteInfo.userid;
+        console.log('User ID:', userId);
+        
+        // Fetch user role from database (only if userId is valid)
+        if (userId) {
+          userRole = await getUserRole(userId);
+          console.log('User role:', userRole);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user info or role:', error);
+      // Continue without role information
+    }
+
+    // Return the token and role information to the frontend
+    console.log('Login successful, returning token and role info');
     return NextResponse.json({
       token: data.token,
-      message: 'Login successful'
+      message: 'Login successful',
+      userId: userId,
+      role: userRole ? {
+        roleId: userRole.roleId,
+        roleName: userRole.roleName,
+        roleShortname: userRole.roleShortname,
+      } : null,
     });
 
   } catch (error) {
