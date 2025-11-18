@@ -39,11 +39,12 @@ const getPageIcon = (title?: string, customIcon?: string) => {
 
 export default function Navigation({ title, showBackButton = false, icon }: NavigationProps) {
   const router = useRouter();
-  const { logout, userId } = useAuth();
+  const { logout, userId, role } = useAuth();
   const [userName, setUserName] = useState<string>('User');
+  const [userRole, setUserRole] = useState<string>('Student');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // Fetch username
+  // Fetch username and set role
   useEffect(() => {
     const fetchUserName = async () => {
       if (!userId) return;
@@ -80,7 +81,20 @@ export default function Navigation({ title, showBackButton = false, icon }: Navi
     };
 
     fetchUserName();
-  }, [userId]);
+    
+    // Set role display name
+    if (role?.roleShortname === 'editingteacher') {
+      setUserRole('Teacher');
+    } else if (role?.roleShortname === 'student') {
+      setUserRole('Student');
+    } else if (role?.roleShortname === 'manager') {
+      setUserRole('Manager');
+    } else if (role?.roleName) {
+      setUserRole(role.roleName);
+    } else {
+      setUserRole('Student');
+    }
+  }, [userId, role]);
 
   const handleLogout = async () => {
     setIsDrawerOpen(false);
@@ -153,7 +167,18 @@ export default function Navigation({ title, showBackButton = false, icon }: Navi
             <div className="flex items-center gap-2">
               {/* Desktop: User info + Logout button */}
               <div className="hidden sm:flex items-center gap-2">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-lg">
+                {/* Manager Cohort Assignment Button */}
+                {role?.roleShortname === 'manager' && (
+                  <button
+                    onClick={() => router.push('/admin/cohort-assignments')}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 text-blue-600 border border-blue-200 hover:bg-blue-500/20 rounded-lg transition-colors active:scale-95"
+                    title="Manage Cohort Assignments"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span className="text-sm font-medium hidden lg:inline">Cohort Roles</span>
+                  </button>
+                )}
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-lg" title={`Role: ${userRole}`}>
                   <User className="w-4 h-4 text-blue-600" />
                   <span className="text-sm font-medium truncate max-w-[150px] md:max-w-[200px] text-gray-900">
                     {userName}
@@ -216,9 +241,24 @@ export default function Navigation({ title, showBackButton = false, icon }: Navi
                   <p className="text-sm font-semibold text-gray-900 truncate">
                     {userName}
                   </p>
-                  <p className="text-xs text-gray-600">Moodle User</p>
+                  <p className="text-xs text-gray-600">{userRole}</p>
                 </div>
               </div>
+
+              {/* Manager Cohort Assignment Button */}
+              {role?.roleShortname === 'manager' && (
+                <button
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    router.push('/admin/cohort-assignments');
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 mb-2 text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition-colors active:scale-95 font-medium"
+                  aria-label="Manage Cohort Assignments"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Manage Cohort Roles</span>
+                </button>
+              )}
 
               {/* Logout Button */}
               <button

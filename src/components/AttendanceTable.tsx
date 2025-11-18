@@ -442,18 +442,16 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
       )}
 
       {/* Filter Button */}
-      <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowFilters(true)}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm"
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowFilters(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                 </svg>
-                <span className="font-medium">Filters</span>
+                <span>Filters</span>
                 {selectedCourses.size < allCourses.length && (
                   <span className="ml-1 px-2.5 py-0.5 bg-white text-blue-600 rounded-full text-xs font-bold">
                     {selectedCourses.size}/{allCourses.length}
@@ -461,28 +459,28 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                 )}
               </button>
 
-              {/* Download Button with Dropdown */}
-              <div className="relative download-menu-container">
-                <button
-                  onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-                  disabled={isDownloading || visibleSessionDates.length === 0}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
+          {/* Download Button with Dropdown */}
+          <div className="relative download-menu-container">
+            <button
+              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+              disabled={isDownloading || visibleSessionDates.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                   title="Download filtered data"
                 >
                   {isDownloading ? (
                     <>
-                      <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      <span className="font-medium">Downloading...</span>
+                      <span>Downloading...</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
-                      <span className="font-medium">Download</span>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <span>Download</span>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </>
@@ -525,34 +523,32 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                 )}
               </div>
             
-            {baseUrl && (
-              <button
-                onClick={() => setShowSettings(true)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm"
-                title="Settings - Configure field mappings"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-            )}
-            </div>
-            
-            {/* Date Range Display */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-white text-sm text-gray-700 border border-gray-200 rounded-lg">
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          {baseUrl && (
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all"
+              title="Settings - Configure field mappings"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              <span className="font-medium">
-                <span className="text-gray-900">
-                  {new Date(dateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  {' - '}
-                  {new Date(dateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              </span>
-            </div>
-          </div>
+            </button>
+          )}
+        </div>
+        
+        {/* Date Range Display */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-white text-sm text-gray-700 border border-gray-200 rounded-lg shadow-sm">
+          <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="font-medium">
+            <span className="text-gray-900">
+              {new Date(dateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {' - '}
+              {new Date(dateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+            </span>
+          </span>
         </div>
       </div>
 
@@ -617,9 +613,9 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
             <thead className="bg-gray-50">
               {/* Date Row */}
               <tr>
-                <th 
+                <th
                   rowSpan={sessionBasedTracking ? 1 : 2}
-                  className="sticky left-0 z-20 px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider bg-gray-50 border-r border-gray-300"
+                  className="sticky left-0 z-20 px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-r border-gray-300"
                 >
                   Student Name
                 </th>
@@ -639,31 +635,36 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
               ))}
               <th
                 rowSpan={sessionBasedTracking ? 1 : 2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
+                className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-blue-50"
+                title="Total Present"
               >
-                Total P
+                P
               </th>
               <th
                 rowSpan={sessionBasedTracking ? 1 : 2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
+                className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-blue-50"
+                title="Total Absent"
               >
-                Total A
+                A
               </th>
               <th
                 rowSpan={sessionBasedTracking ? 1 : 2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
+                className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-blue-50"
+                title={sessionBasedTracking ? 'Half Days' : 'Total Late'}
               >
-                {sessionBasedTracking ? 'Half Days' : 'Total L'}
+                {sessionBasedTracking ? 'Half' : 'L'}
               </th>
               <th
                 rowSpan={sessionBasedTracking ? 1 : 2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
+                className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-blue-50"
+                title="Total Excused"
               >
-                Total E
+                E
               </th>
               <th
                 rowSpan={sessionBasedTracking ? 1 : 2}
-                className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider bg-blue-50"
+                className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-blue-50"
+                title="Total Sessions"
               >
                 Total
               </th>
@@ -693,7 +694,7 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
             {studentsWithSessionTracking.map((student, studentIndex) => {
               return (
                 <tr key={studentIndex} className="hover:bg-gray-50">
-                  <td className="sticky left-0 z-10 px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-white">
+                  <td className="sticky left-0 z-10 px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-white border-r border-gray-200">
                     {student.studentName}
                   </td>
                   {visibleSessionDates.map((dateGroup, dateIndex) => {
