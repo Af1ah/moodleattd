@@ -101,7 +101,8 @@ export async function assignCohortToUser(
   cohortId: number,
   userId: number,
   roleId: number,
-  assignedBy: number
+  assignedBy: number,
+  selectedCourses?: number[]
 ) {
   try {
     const assignment = await prisma.mdl_cohort_role_assignments.create({
@@ -111,10 +112,11 @@ export async function assignCohortToUser(
         roleid: BigInt(roleId),
         timeassigned: BigInt(Math.floor(Date.now() / 1000)),
         assignedby: BigInt(assignedBy),
+        selectedcourses: selectedCourses ? JSON.stringify(selectedCourses) : null,
       },
     });
 
-    console.log(`✅ Assigned cohort ${cohortId} to user ${userId}`);
+    console.log(`✅ Assigned cohort ${cohortId} to user ${userId} with ${selectedCourses?.length || 'all'} courses`);
     return assignment;
   } catch (error) {
     console.error(`❌ Error assigning cohort ${cohortId} to user ${userId}:`, error);
@@ -256,12 +258,17 @@ export async function getUserCohortAssignmentsWithDetails(userId: number) {
 
     const result = assignments.map((assignment) => {
       const cohort = cohorts.find((c) => c.id === assignment.cohortid);
+      const selectedCourses = assignment.selectedcourses 
+        ? JSON.parse(assignment.selectedcourses) 
+        : null;
+      
       return {
         cohortId: Number(assignment.cohortid),
         cohortName: cohort?.name || 'Unknown',
         cohortIdnumber: cohort?.idnumber,
         roleId: Number(assignment.roleid),
         timeAssigned: Number(assignment.timeassigned),
+        selectedCourses: selectedCourses,
       };
     });
 
@@ -269,6 +276,32 @@ export async function getUserCohortAssignmentsWithDetails(userId: number) {
     return result;
   } catch (error) {
     console.error(`❌ Error fetching cohort assignments for user ${userId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Update selected courses for a cohort assignment
+ */
+export async function updateCohortCourseSelection(
+  cohortId: number,
+  userId: number,
+  selectedCourses: number[]
+) {
+  try {
+    await prisma.mdl_cohort_role_assignments.updateMany({
+      where: {
+        cohortid: BigInt(cohortId),
+        userid: BigInt(userId),
+      },
+      data: {
+        selectedcourses: JSON.stringify(selectedCourses),
+      },
+    });
+
+    console.log(`✅ Updated course selection for cohort ${cohortId}, user ${userId}: ${selectedCourses.length} courses`);
+  } catch (error) {
+    console.error(`❌ Error updating course selection for cohort ${cohortId}, user ${userId}:`, error);
     throw error;
   }
 }

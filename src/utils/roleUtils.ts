@@ -1,4 +1,4 @@
-import { LTISessionData } from '@/lib/session';
+import { LTISession } from '@/types/lti';
 
 // Common LTI role identifiers for students
 const STUDENT_ROLES = [
@@ -25,7 +25,7 @@ const INSTRUCTOR_ROLES = [
 /**
  * Determines if a user is a student based on their LTI roles
  */
-export function isStudent(session: LTISessionData): boolean {
+export function isStudent(session: LTISession): boolean {
   if (!session?.roles || session.roles.length === 0) {
     console.log('🔍 Role check: No roles found');
     return false;
@@ -48,7 +48,7 @@ export function isStudent(session: LTISessionData): boolean {
 /**
  * Determines if a user is an instructor based on their LTI roles
  */
-export function isInstructor(session: LTISessionData): boolean {
+export function isInstructor(session: LTISession): boolean {
   if (!session?.roles || session.roles.length === 0) {
     console.log('🔍 Role check: No roles found');
     return false;
@@ -71,7 +71,7 @@ export function isInstructor(session: LTISessionData): boolean {
 /**
  * Gets the primary role of the user for display purposes
  */
-export function getPrimaryRole(session: LTISessionData): 'student' | 'instructor' | 'unknown' {
+export function getPrimaryRole(session: LTISession): 'student' | 'instructor' | 'unknown' {
   if (isInstructor(session)) {
     return 'instructor';
   }

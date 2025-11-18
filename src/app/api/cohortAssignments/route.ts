@@ -4,11 +4,13 @@ import {
   removeCohortFromUser,
   getUserCohortAssignmentsWithDetails,
   getNonStudentUsers,
+  updateCohortCourseSelection,
 } from '@/services/roleService';
 
 /**
  * GET: Get all non-student users (for admin UI)
  * POST: Assign a cohort to a user
+ * PATCH: Update selected courses for a cohort assignment
  * DELETE: Remove a cohort assignment from a user
  */
 
@@ -85,6 +87,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { 
         error: 'Failed to assign cohort',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { cohortId, userId, selectedCourses } = body;
+
+    if (!cohortId || !userId || !selectedCourses) {
+      return NextResponse.json(
+        { error: 'Missing required parameters: cohortId, userId, selectedCourses' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`📝 Updating course selection for cohort ${cohortId}, user ${userId}...`);
+
+    await updateCohortCourseSelection(cohortId, userId, selectedCourses);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Course selection updated successfully',
+    });
+  } catch (error) {
+    console.error('❌ Update course selection API error:', error);
+    
+    return NextResponse.json(
+      { 
+        error: 'Failed to update course selection',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }

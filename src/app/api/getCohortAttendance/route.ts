@@ -18,7 +18,7 @@ import { getCompleteAttendanceData } from '@/services/attendanceDBService';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cohortId, datefrom, dateto } = body;
+    const { cohortId, datefrom, dateto, userId } = body;
 
     if (!cohortId) {
       return NextResponse.json(
@@ -79,11 +79,42 @@ export async function POST(request: NextRequest) {
 
     console.log(`📚 Found ${attendanceActivities.length} courses with attendance for this cohort`);
 
+    // If userId is provided, check if they have specific courses selected for this cohort
+    let allowedCourseIds: number[] | null = null;
+    if (userId) {
+      const assignment = await prisma.mdl_cohort_role_assignments.findFirst({
+        where: {
+          cohortid: BigInt(cohortId),
+          userid: BigInt(userId),
+        },
+        select: {
+          selectedcourses: true,
+        },
+      });
+
+      if (assignment?.selectedcourses) {
+        try {
+          allowedCourseIds = JSON.parse(assignment.selectedcourses);
+          console.log(`🔒 User ${userId} has ${allowedCourseIds?.length || 0} selected courses for this cohort`);
+        } catch (error) {
+          console.error('Error parsing selectedcourses:', error);
+        }
+      } else {
+        console.log(`🔓 User ${userId} has access to all courses for this cohort`);
+      }
+    }
+
     // Fetch attendance data for each course
     const courseAttendanceData = [];
     
     for (const activity of attendanceActivities) {
       const courseId = Number(activity.course);
+      
+      // Skip if user has specific courses selected and this course is not in the list
+      if (allowedCourseIds && allowedCourseIds.length > 0 && !allowedCourseIds.includes(courseId)) {
+        console.log(`  ⏭️ Skipping course ${courseId} - not in user's selected courses`);
+        continue;
+      }
       
       try {
         console.log(`  📖 Fetching attendance for course ${courseId}...`);
@@ -212,6 +243,7 @@ export async function GET(request: NextRequest) {
     const cohortId = searchParams.get('cohortId');
     const datefrom = searchParams.get('datefrom');
     const dateto = searchParams.get('dateto');
+    const userId = searchParams.get('userId');
 
     if (!cohortId) {
       return NextResponse.json(
@@ -225,6 +257,7 @@ export async function GET(request: NextRequest) {
       cohortId: parseInt(cohortId),
       datefrom: datefrom ? parseInt(datefrom) : undefined,
       dateto: dateto ? parseInt(dateto) : undefined,
+      userId: userId ? parseInt(userId) : undefined,
     };
 
     const mockRequest = {

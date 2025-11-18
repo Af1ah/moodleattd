@@ -16,6 +16,13 @@ interface CohortAssignment {
   cohortIdnumber: string | null;
   roleId: number;
   timeAssigned: number;
+  selectedCourses: number[] | null;
+}
+
+interface Course {
+  id: number;
+  attendanceId: number;
+  name: string;
 }
 
 interface User {
@@ -46,6 +53,10 @@ function AdminCohortAssignment() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [cohortCourses, setCohortCourses] = useState<Record<number, Course[]>>({});
+  const [loadingCourses, setLoadingCourses] = useState<Record<number, boolean>>({});
+  const [expandedCohortCourses, setExpandedCohortCourses] = useState<Record<string, boolean>>({});
 
   // Check if user is admin (manager)
   useEffect(() => {
@@ -162,7 +173,88 @@ function AdminCohortAssignment() {
     }
   };
 
+  const fetchCoursesForCohort = async (cohortId: number) => {
+    if (cohortCourses[cohortId]) return; // Already loaded
+    
+    try {
+      setLoadingCourses((prev) => ({ ...prev, [cohortId]: true }));
+      const response = await fetch(`/api/cohortCourses?cohortId=${cohortId}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch courses');
+      }
+      
+      const data = await response.json();
+      setCohortCourses((prev) => ({ ...prev, [cohortId]: data.courses || [] }));
+    } catch (err) {
+      console.error('Failed to fetch courses:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load courses');
+    } finally {
+      setLoadingCourses((prev) => ({ ...prev, [cohortId]: false }));
+    }
+  };
+
+  const handleUpdateCourseSelection = async (
+    targetUserId: number,
+    cohortId: number,
+    selectedCourseIds: number[]
+  ) => {
+    try {
+      setError(null);
+      setSuccess(null);
+
+      const response = await fetch('/api/cohortAssignments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cohortId,
+          userId: targetUserId,
+          selectedCourses: selectedCourseIds,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to update course selection');
+      }
+
+      setSuccess('Course selection updated successfully');
+      
+      // Refresh users list
+      const usersResponse = await fetch('/api/cohortAssignments');
+      const usersData = await usersResponse.json();
+      setUsers(usersData.users || []);
+    } catch (err) {
+      console.error('Failed to update course selection:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update course selection');
+    }
+  };
+
+  const toggleCohortCourses = (userId: number, cohortId: number) => {
+    const key = `${userId}-${cohortId}`;
+    const isExpanding = !expandedCohortCourses[key];
+    
+    setExpandedCohortCourses((prev) => ({ ...prev, [key]: isExpanding }));
+    
+    if (isExpanding) {
+      fetchCoursesForCohort(cohortId);
+    }
+  };
+
   const isLoading = isLoadingUsers || isLoadingCohorts;
+
+  // Filter users based on search query
+  const filteredUsers = users.filter((user) => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      user.firstname.toLowerCase().includes(query) ||
+      user.lastname.toLowerCase().includes(query) ||
+      user.username.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query)
+    );
+  });
 
   if (isLoading) {
     return (
@@ -208,8 +300,71 @@ function AdminCohortAssignment() {
             </div>
           )}
 
+          {/* Search Input */}
+          <div className="mb-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by name, username, or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-3 pl-11 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <svg
+                className="absolute left-3 top-3.5 w-5 h-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-3.5 text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-sm text-gray-600">
+              Showing {filteredUsers.length} of {users.length} user{users.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+
           <div className="space-y-4">
-            {users.map((user) => {
+            {filteredUsers.length === 0 ? (
+              <div className="text-center py-12">
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No users found</h3>
+                <p className="mt-1 text-sm text-gray-500">Try adjusting your search query.</p>
+              </div>
+            ) : (
+              filteredUsers.map((user) => {
               const isExpanded = expandedUserId === user.id;
               const assignedCohortIds = user.cohorts.map((c) => c.cohortId);
               const availableCohorts = allCohorts.filter(
@@ -271,26 +426,121 @@ function AdminCohortAssignment() {
                         {user.cohorts.length === 0 ? (
                           <p className="text-sm text-gray-500">No cohorts assigned yet.</p>
                         ) : (
-                          <div className="space-y-2">
-                            {user.cohorts.map((cohort) => (
-                              <div
-                                key={cohort.cohortId}
-                                className="flex items-center justify-between p-3 bg-blue-50 rounded-lg"
-                              >
-                                <div>
-                                  <p className="font-medium text-gray-900">{cohort.cohortName}</p>
-                                  {cohort.cohortIdnumber && (
-                                    <p className="text-sm text-gray-600">ID: {cohort.cohortIdnumber}</p>
+                          <div className="space-y-3">
+                            {user.cohorts.map((cohort) => {
+                              const courseKey = `${user.id}-${cohort.cohortId}`;
+                              const isCoursesExpanded = expandedCohortCourses[courseKey];
+                              const courses = cohortCourses[cohort.cohortId] || [];
+                              const isLoadingCoursesForCohort = loadingCourses[cohort.cohortId];
+                              const selectedCourseIds = cohort.selectedCourses || [];
+
+                              return (
+                                <div
+                                  key={cohort.cohortId}
+                                  className="border border-blue-200 rounded-lg overflow-hidden"
+                                >
+                                  <div className="flex items-center justify-between p-3 bg-blue-50">
+                                    <div className="flex-1">
+                                      <p className="font-medium text-gray-900">{cohort.cohortName}</p>
+                                      {cohort.cohortIdnumber && (
+                                        <p className="text-sm text-gray-600">ID: {cohort.cohortIdnumber}</p>
+                                      )}
+                                      {selectedCourseIds.length > 0 && (
+                                        <p className="text-xs text-blue-600 mt-1">
+                                          {selectedCourseIds.length} course(s) selected
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => toggleCohortCourses(user.id, cohort.cohortId)}
+                                        className="px-3 py-1 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700"
+                                      >
+                                        {isCoursesExpanded ? 'Hide' : 'Select'} Courses
+                                      </button>
+                                      <button
+                                        onClick={() => handleRemoveCohort(user.id, cohort.cohortId)}
+                                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {isCoursesExpanded && (
+                                    <div className="p-4 bg-white border-t border-blue-200">
+                                      {isLoadingCoursesForCohort ? (
+                                        <div className="text-center py-4">
+                                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                                          <p className="text-sm text-gray-600 mt-2">Loading courses...</p>
+                                        </div>
+                                      ) : courses.length === 0 ? (
+                                        <p className="text-sm text-gray-500">No courses found for this cohort.</p>
+                                      ) : (
+                                        <div>
+                                          <h5 className="text-sm font-medium text-gray-900 mb-3">
+                                            Select Courses (All courses selected if none chosen):
+                                          </h5>
+                                          <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
+                                            {courses.map((course) => {
+                                              const isSelected = selectedCourseIds.includes(course.id);
+                                              
+                                              return (
+                                                <label
+                                                  key={course.id}
+                                                  className="flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                                                >
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={(e) => {
+                                                      const newSelection = e.target.checked
+                                                        ? [...selectedCourseIds, course.id]
+                                                        : selectedCourseIds.filter((id) => id !== course.id);
+                                                      
+                                                      handleUpdateCourseSelection(
+                                                        user.id,
+                                                        cohort.cohortId,
+                                                        newSelection
+                                                      );
+                                                    }}
+                                                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                                  />
+                                                  <span className="text-sm text-gray-700">{course.name}</span>
+                                                </label>
+                                              );
+                                            })}
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <button
+                                              onClick={() => {
+                                                const allCourseIds = courses.map((c) => c.id);
+                                                handleUpdateCourseSelection(
+                                                  user.id,
+                                                  cohort.cohortId,
+                                                  allCourseIds
+                                                );
+                                              }}
+                                              className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                            >
+                                              Select All
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                handleUpdateCourseSelection(user.id, cohort.cohortId, []);
+                                              }}
+                                              className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                            >
+                                              Clear All
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
-                                <button
-                                  onClick={() => handleRemoveCohort(user.id, cohort.cohortId)}
-                                  className="text-red-600 hover:text-red-800 text-sm font-medium"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -331,7 +581,7 @@ function AdminCohortAssignment() {
                   )}
                 </div>
               );
-            })}
+            }))}
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/AuthProvider';
-import { LTISession } from '@/types/lti';
+import { LTISessionData } from '@/lib/session';
 import FilterModal, { DateRange } from '@/components/FilterModal';
 
 interface StudentAttendanceSession {
@@ -55,7 +55,7 @@ function StudentAttendancePage() {
   const [attendanceData, setAttendanceData] = useState<AttendanceRegisterData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ltiSession, setLtiSession] = useState<LTISession | null>(null);
+  const [ltiSession, setLtiSession] = useState<LTISessionData | null>(null);
   
   // Filter modal state
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -85,14 +85,15 @@ function StudentAttendancePage() {
   }, []);
 
   // Fetch student attendance data
-  const fetchStudentAttendance = useCallback(async (session: LTISession) => {
+  const fetchStudentAttendance = useCallback(async (session: LTISessionData) => {
     if (!session) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const userToken = localStorage.getItem('moodleToken');
+      // For LTI users, use session token; for manual users, use localStorage
+      const userToken = session.moodleToken || localStorage.getItem('moodleToken');
       
       if (!userToken) {
         setError('Please login to view your attendance data');
@@ -150,7 +151,7 @@ function StudentAttendancePage() {
   }, [courseId]);
 
   // Transform attendance data for a single student into register format
-  const transformDataForStudent = (sessions: AttendanceSessionData[], session: LTISession): AttendanceRegisterData => {
+  const transformDataForStudent = (sessions: AttendanceSessionData[], session: LTISessionData): AttendanceRegisterData => {
     const attendanceMatrix: { [activityName: string]: { [date: string]: StudentAttendanceSession[] } } = {};
     const attendanceActivitiesSet = new Set<string>();
     const sessionDatesSet = new Set<string>();
@@ -168,7 +169,7 @@ function StudentAttendancePage() {
         hour12: true
       });
       
-      const attendanceName = sessionData.attendanceName || session.courseName;
+      const attendanceName = sessionData.attendanceName || session.courseName || 'Unknown';
       const sessionId = `${sessionDate}_${sessionTime}_${attendanceName}`;
 
       // Add to sets for tracking unique activities and dates
@@ -224,7 +225,7 @@ function StudentAttendancePage() {
       
       // Add session to the matrix (sorted by time)
       attendanceMatrix[attendanceName][sessionDate].push(studentSession);
-      attendanceMatrix[attendanceName][sessionDate].sort((a, b) => a.sessionTime.localeCompare(b.sessionTime));
+      attendanceMatrix[attendanceName][sessionDate].sort((a: StudentAttendanceSession, b: StudentAttendanceSession) => a.sessionTime.localeCompare(b.sessionTime));
     });
 
     const attendanceActivities = Array.from(attendanceActivitiesSet).sort();
@@ -235,7 +236,7 @@ function StudentAttendancePage() {
     return {
       studentId: session.userId,
       studentName: session.userName,
-      courseName: session.courseName,
+      courseName: session.courseName || 'Unknown Course',
       attendanceActivities,
       sessionDates,
       attendanceMatrix,
@@ -624,8 +625,8 @@ function StudentAttendancePage() {
                   <span className="ml-2 text-blue-700">{ltiSession.courseName} ({ltiSession.courseId})</span>
                 </div>
                 <div>
-                  <span className="font-medium text-blue-800">Roles:</span>
-                  <span className="ml-2 text-blue-700">{ltiSession.roles.join(', ')}</span>
+                  <span className="font-medium text-blue-800">Role:</span>
+                  <span className="ml-2 text-blue-700">{ltiSession.roleName || 'Student'}</span>
                 </div>
               </div>
             </div>

@@ -287,12 +287,20 @@ function MainContent() {
                 <div className="flex-1">
                   <h3 className="font-semibold text-red-900 text-lg">Unable to Load Reports</h3>
                   <p className="text-red-700 mt-2">{error}</p>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
-                  >
-                    Retry
-                  </button>
+                  <div className="mt-4 flex gap-3">
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
+                    >
+                      Retry
+                    </button>
+                    <button
+                      onClick={() => router.push('/login')}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors"
+                    >
+                      Go to Login
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

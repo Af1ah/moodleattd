@@ -6,8 +6,6 @@ export async function GET() {
     console.log('🔍 LTI Session API: Getting session...');
     const session = await getLTISession();
     
-    console.log('📊 Session data:', session ? 'Found' : 'Not found');
-    
     if (!session) {
       console.log('❌ No LTI session found in cookies');
       return NextResponse.json(
@@ -16,10 +14,14 @@ export async function GET() {
       );
     }
 
-    console.log('✅ Returning session data');
+    console.log('✅ Session found:', {
+      userId: session.userId,
+      userName: session.userName,
+      role: session.roleShortname,
+    });
     return NextResponse.json({ session });
   } catch (error) {
-    console.error('Failed to get LTI session:', error);
+    console.error('❌ Failed to get LTI session:', error);
     return NextResponse.json(
       { error: 'Failed to retrieve session data', details: String(error) },
       { status: 500 }

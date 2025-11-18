@@ -208,6 +208,7 @@ function CohortAttendanceReport() {
         },
         body: JSON.stringify({
           cohortId: cohortId,
+          userId: userId, // Pass userId to filter courses
         }),
       });
 

@@ -234,7 +234,7 @@ function IndividualCohortAttendanceReport() {
     setError(null);
     
     try {
-      const response = await fetch(`/api/getCohortAttendance?cohortId=${cohort.id}`, {
+      const response = await fetch(`/api/getCohortAttendance?cohortId=${cohort.id}&userId=${userId}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

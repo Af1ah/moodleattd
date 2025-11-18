@@ -262,12 +262,13 @@ model mdl_role_assignments {
 // Custom table: Cohort assignments for non-student roles (teachers, managers, etc.)
 // This allows teachers/managers to access specific cohorts
 model mdl_cohort_role_assignments {
-  id           BigInt   @id @default(autoincrement())
-  cohortid     BigInt
-  userid       BigInt
-  roleid       BigInt
-  timeassigned BigInt
-  assignedby   BigInt
+  id               BigInt   @id @default(autoincrement())
+  cohortid         BigInt
+  userid           BigInt
+  roleid           BigInt
+  timeassigned     BigInt
+  assignedby       BigInt
+  selectedcourses  String?  @db.Text  // JSON array of course IDs
   
   @@map("mdl_cohort_role_assignments")
   @@unique([cohortid, userid], name: "mdl_cohoroleass_cohuse_uix")

@@ -15,6 +15,7 @@ interface AuthContextType {
   role: RoleInfo | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isLtiUser: boolean;
   login: (token: string, userId?: number, role?: RoleInfo) => void;
   logout: () => Promise<void>;
 }
@@ -30,33 +31,65 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [userId, setUserId] = useState<number | null>(null);
   const [role, setRole] = useState<RoleInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLtiUser, setIsLtiUser] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   const isAuthenticated = !!token;
 
   useEffect(() => {
-    // Check for existing token on mount (only on client side)
-    if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem('moodleToken');
-      const storedUserId = localStorage.getItem('moodleUserId');
-      const storedRole = localStorage.getItem('moodleRole');
-      
-      if (storedToken) {
-        setToken(storedToken);
-      }
-      if (storedUserId) {
-        setUserId(parseInt(storedUserId));
-      }
-      if (storedRole) {
-        try {
-          setRole(JSON.parse(storedRole));
-        } catch (e) {
-          console.error('Error parsing stored role:', e);
+    // Check for LTI session first, then fallback to localStorage
+    const checkAuth = async () => {
+      try {
+        // Check for LTI session
+        const response = await fetch('/api/lti/session');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.session) {
+            console.log('✅ LTI session found:', data.session);
+            // For LTI users, use their token or mark as LTI-authenticated
+            const ltiToken = data.session.moodleToken || 'LTI_SESSION_' + data.session.userId;
+            setToken(ltiToken);
+            setUserId(parseInt(data.session.userId));
+            setRole({
+              roleId: 0, // Not needed for LTI
+              roleName: data.session.roleName || 'User',
+              roleShortname: data.session.roleShortname || 'user',
+            });
+            setIsLtiUser(true);
+            setIsLoading(false);
+            return;
+          }
         }
+      } catch (error) {
+        console.log('No LTI session, checking localStorage');
       }
-    }
-    setIsLoading(false);
+
+      // Fallback to localStorage
+      if (typeof window !== 'undefined') {
+        const storedToken = localStorage.getItem('moodleToken');
+        const storedUserId = localStorage.getItem('moodleUserId');
+        const storedRole = localStorage.getItem('moodleRole');
+        
+        if (storedToken) {
+          setToken(storedToken);
+        }
+        if (storedUserId) {
+          setUserId(parseInt(storedUserId));
+        }
+        if (storedRole) {
+          try {
+            setRole(JSON.parse(storedRole));
+          } catch (e) {
+            console.error('Error parsing stored role:', e);
+          }
+        }
+        setIsLtiUser(false);
+      }
+      setIsLoading(false);
+    };
+
+    checkAuth();
   }, []);
 
   useEffect(() => {
@@ -65,30 +98,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.log('Auth redirect check:', {
         isAuthenticated,
         pathname,
-        token: !!token
+        token: !!token,
+        isLtiUser
       });
       
-      const isLtiUser = typeof window !== 'undefined' ? localStorage.getItem('isLtiUser') === 'true' : false;
-      const ltiReturnUrl = typeof window !== 'undefined' ? localStorage.getItem('ltiReturnUrl') : null;
+      // Skip redirect for LTI users - they're already on the right page
+      if (isLtiUser) {
+        console.log('LTI user detected, skipping redirect');
+        return;
+      }
       
+      // For non-LTI users, enforce authentication
       if (!isAuthenticated && pathname !== '/login' && !pathname.startsWith('/lti/')) {
         console.log('Redirecting to login');
         router.push('/login');
       } else if (isAuthenticated && pathname === '/login') {
-        if (isLtiUser && ltiReturnUrl) {
-          // LTI user: redirect to their course report
-          console.log('Redirecting LTI user to:', ltiReturnUrl);
-          localStorage.removeItem('isLtiUser');
-          localStorage.removeItem('ltiReturnUrl');
-          router.push(ltiReturnUrl);
-        } else {
-          // Normal user: redirect to home
-          console.log('Redirecting normal user to home');
-          router.push('/');
-        }
+        console.log('Redirecting authenticated user to home');
+        router.push('/');
       }
     }
-  }, [isAuthenticated, isLoading, pathname, router, token]);
+  }, [isAuthenticated, isLoading, pathname, router, token, isLtiUser]);
 
   const login = (newToken: string, newUserId?: number, newRole?: RoleInfo) => {
     console.log('Login function called with token:', newToken);
@@ -105,34 +134,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(newToken);
     setUserId(newUserId || null);
     setRole(newRole || null);
+    setIsLtiUser(false); // Manual login is not LTI
     console.log('Token and user state updated');
     
-    // Check if this is an LTI user
-    const isLtiUser = typeof window !== 'undefined' ? localStorage.getItem('isLtiUser') === 'true' : false;
-    const ltiReturnUrl = typeof window !== 'undefined' ? localStorage.getItem('ltiReturnUrl') : null;
-    
-    if (isLtiUser && ltiReturnUrl) {
-      // LTI user: redirect to their course report
-      console.log('Redirecting LTI user to:', ltiReturnUrl);
-      localStorage.removeItem('isLtiUser');
-      localStorage.removeItem('ltiReturnUrl');
-      router.push(ltiReturnUrl);
-    } else {
-      // Normal user: redirect to home
-      console.log('Redirecting normal user to home');
-      router.push('/');
-    }
+    // Normal user: redirect to home
+    console.log('Redirecting authenticated user to home');
+    router.push('/');
   };
 
   const logout = async () => {
     try {
-      // Call logout API to invalidate token on server
-      await fetch('/api/logout', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // Call logout API to invalidate token on server (for non-LTI users)
+      if (!isLtiUser) {
+        await fetch('/api/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+      }
     } catch (error) {
       console.error('Error during logout API call:', error);
       // Continue with local logout even if API call fails
@@ -147,6 +167,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
     setUserId(null);
     setRole(null);
+    setIsLtiUser(false);
     router.push('/login');
   };
 
@@ -156,6 +177,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     role,
     isAuthenticated,
     isLoading,
+    isLtiUser,
     login,
     logout,
   };
