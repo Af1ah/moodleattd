@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       if (assignment?.selectedcourses) {
         try {
           allowedCourseIds = JSON.parse(assignment.selectedcourses);
-          console.log(`🔒 User ${userId} has ${allowedCourseIds?.length || 0} selected courses for this cohort`);
+          // User has selected courses for this cohort
         } catch (error) {
           console.error('Error parsing selectedcourses:', error);
         }

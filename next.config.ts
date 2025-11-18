@@ -7,6 +7,15 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true
   },
+  
+  // Remove console logs in production for security
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' 
+      ? {
+          exclude: ['error'] // Keep console.error for critical issues
+        }
+      : false
+  }
 };
 
 export default nextConfig;

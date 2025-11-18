@@ -1,6 +1,159 @@
 /**
  * LTI 1.0/1.1 Launch Handler
- * 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+**Recommendation:** Deploy with the `next.config.ts` configuration. This is the industry-standard approach used by major frameworks and provides automatic security without code refactoring.- **Performance**: Better (removed code = smaller bundle)- **Minimal code changes**: Works with existing code- **Development**: Full logging for debugging- **Production builds**: Clean, secure, no debug logsWith the `next.config.ts` change:## ✨ SummaryThis activates the console removal in `next.config.ts`.```NODE_ENV=production```envEnsure your `.env.production` has:## 📝 Environment Variables```logger.error('API failed'); // Still shows in productionlogger.warn('Cache miss');logger.log('User logged in'); // No PIIimport { logger } from '@/utils/logger';// New code (with logger)console.error('API failed');console.warn('Cache miss');console.log('User logged in:', userId);// Old code```typescriptIf you prefer explicit control, migrate console calls to the logger:## 🔄 Alternative: Manual Migration to Logger❌ Log database query results with personal data❌ Log authentication states with user info❌ Log full API responses with sensitive data❌ Log user credentials, tokens, or PII### DON'T:✅ Test production builds before deployment✅ Use the custom logger for conditional logging✅ Add debug logs during development (auto-removed in prod)✅ Use `console.error()` for critical errors (kept in production)### DO:## 🛡️ Best Practices Going Forward4. You should see **no debug logs**, only errors (if any)3. Navigate through your app2. Check Console tab1. Open browser DevTools (F12)### Verify Console Removal:```# Only errors should appear if they occur# Open browser console - you should see NO debug logsnpm start# Start production servernpm run build# Build for production```bash### Test Production Build Locally:## 🔍 Testing```grep -r "console\." src/ --include="*.ts" --include="*.tsx"# Find remaining console statements```bashIf you want to manually remove more console logs, search for:### Manual Review Recommended:- Error tracking (also in production)- Data transformation logs- Cache status messages- Business logic debugging### What Remains (Development Only):After cleanup, approximately **200+ console statements** will be automatically removed in production builds.## 📊 Remaining Console Statements```npm run dev# All console logs remain active```bash### For Development:```npm start# The production build will automatically remove console statementsnpm run build# Build with console removal```bash### For Production:## 🚀 Build and Deploy- ✅ `/src/app/api/getCohortAttendance/route.ts` - Removed user selection logs- ✅ `/src/app/student-all-courses/page.tsx` - Removed course data logs- ✅ `/src/app/student-attendance/[courseId]/page.tsx` - Removed user ID logs- ✅ `/src/lib/session.ts` - Removed session data logs- ✅ `/src/components/AuthProvider.tsx` - Removed auth state logs- ✅ `/src/app/api/login/route.ts` - Removed token/credential logs- ✅ `/src/app/api/lti/launch/route.ts` - Removed PII exposure### Files Cleaned:6. ❌ Database query results with PII5. ❌ Login credentials flow4. ❌ Course enrollment data3. ❌ LTI session data2. ❌ Authentication tokens in logs1. ❌ User IDs, emails, and names exposure### Critical Security Logs Removed:## 🔒 Security Issues Fixed```// Use: logger.log('User data:', userData);// Instead of: console.log('User data:', userData);import { logger } from '@/utils/logger';```typescriptCreated `/src/utils/logger.ts` for manual migration:### 2. **Custom Logger Utility** (OPTIONAL)- ✅ No performance impact- ✅ Zero code changes required in existing files- ✅ Keeps `console.error` for critical error tracking- ✅ Automatically removes all `console.log`, `console.warn`, `console.info`, `console.debug` in production builds**Benefits:**```}    : false      }        exclude: ['error'] // Keep console.error for critical issues    ? {  removeConsole: process.env.NODE_ENV === 'production' compiler: {```typescriptAdded to `next.config.ts`:### 1. **Automatic Console Removal in Production** (RECOMMENDED)## ✅ Implemented Solutions * 
  * Security Features:
  * - Verifies OAuth consumer key
  * - Validates required LTI parameters
@@ -83,14 +236,6 @@ export async function POST(request: NextRequest) {
     const contextTitle = formData.get('context_title') as string;
     const rolesString = formData.get('roles') as string || '';
 
-    console.log('📦 LTI Parameters:');
-    console.log('  User ID:', userId);
-    console.log('  User Name:', userName);
-    console.log('  User Email:', userEmail);
-    console.log('  Course ID:', contextId);
-    console.log('  Course Name:', contextTitle);
-    console.log('  Roles:', rolesString);
-
     // Validate required parameters
     if (!userId || !contextId) {
       console.error('❌ Missing required parameters');
@@ -140,12 +285,6 @@ export async function POST(request: NextRequest) {
       const userRole = roleAssignment 
         ? { role: roleAssignment.role.name, shortname: roleAssignment.role.shortname }
         : determineUserRole(rolesString);
-
-      console.log('👤 User found:', {
-        id: user.id.toString(),
-        username: user.username,
-        role: userRole.shortname,
-      });
 
       // Get admin token for API calls
       const moodleToken = process.env.NEXT_PUBLIC_MOODLE_TOKEN || process.env.NEXT_PUBLIC_ATTD_TOKEN || '';

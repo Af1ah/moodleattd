@@ -173,7 +173,7 @@ function StudentAttendancePage() {
     setError(null);
 
     try {
-      console.log('👤 Fetching attendance for student:', session.userId, 'course:', courseId);
+      // Fetching attendance data
       
       // Use the same API as student-all-courses page (no date restrictions)
       const response = await fetch('/api/getStudentAllCoursesAttendance', {

@@ -3,9 +3,7 @@ import { getUserRole } from '@/services/roleService';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Login API called');
     const { username, password } = await request.json();
-    console.log('Received username:', username);
 
     // Validate input
     if (!username || !password) {

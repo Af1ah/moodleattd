@@ -189,7 +189,7 @@ function StudentAllCoursesPage() {
         return;
       }
 
-      console.log('📊 Request params:', { studentId, courseIds });
+      // Fetching attendance for multiple courses
 
       const response = await fetch('/api/getStudentAllCoursesAttendance', {
         method: 'POST',

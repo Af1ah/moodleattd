@@ -62,7 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         }
       } catch (error) {
-        console.log('No LTI session, checking localStorage');
+        // Check localStorage for regular login
       }
 
       // Fallback to localStorage
