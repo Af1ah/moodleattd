@@ -158,12 +158,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Continue with local logout even if API call fails
     }
 
-    // Clear local storage and state
+    // Clear all storage and state
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('moodleToken');
-      localStorage.removeItem('moodleUserId');
-      localStorage.removeItem('moodleRole');
+      // Clear specific localStorage items
+      const keysToRemove = [
+        'moodleToken', 
+        'moodleUserId', 
+        'moodleRole', 
+        'isLtiUser', 
+        'courses_list'
+      ];
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Clear all sessionStorage
+      sessionStorage.clear();
+      
+      // Clear cookies if any
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
     }
+    
     setToken(null);
     setUserId(null);
     setRole(null);
@@ -203,7 +220,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="flex justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

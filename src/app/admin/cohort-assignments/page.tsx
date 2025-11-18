@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute, useAuth } from '@/components/AuthProvider';
+import Navigation from '@/components/Navigation';
 
 interface Role {
   id: number;
@@ -258,7 +259,7 @@ function AdminCohortAssignment() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
@@ -268,25 +269,16 @@ function AdminCohortAssignment() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <button
-            onClick={() => router.push('/')}
-            className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Reports
-          </button>
-        </div>
-
-        <div className="bg-white rounded-lg shadow px-6 py-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Cohort Assignments</h1>
-          <p className="text-gray-600 mb-8">
-            Assign cohorts to teachers and managers. Each user can have multiple cohort assignments.
-          </p>
+    <div className="min-h-screen bg-gray-100">
+      <Navigation title="Cohort Assignments" showBackButton={true} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white rounded-lg shadow px-4 sm:px-6 py-6 sm:py-8">
+          <div className="mb-6">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Cohort Assignments</h1>
+            <p className="text-sm sm:text-base text-gray-600">
+              Assign cohorts to teachers and managers. Each user can have multiple cohort assignments.
+            </p>
+          </div>
 
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">

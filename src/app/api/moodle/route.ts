@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     });
 
     const url = `${baseUrl}/webservice/rest/server.php?${queryParams.toString()}`;
-    console.log('Making request to URL:', url);
+    // console.log('Making request to URL:', url);
 
     // Make request with retry logic
     const response = await fetchWithRetry(url, {
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     let data;
     try {
       data = await response.json();
-      console.log('Moodle response:', data);
+      // console.log('Moodle response:', data);
     } catch {
       const text = await response.text();
       console.error('Failed to parse JSON response:', text.substring(0, 500));

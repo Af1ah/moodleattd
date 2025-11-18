@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ProtectedRoute } from '@/components/AuthProvider';
+import Navigation from '@/components/Navigation';
 import AttendanceTable from '@/components/AttendanceTable';
 import { AttendanceTableData } from '@/types/moodle';
 
@@ -177,7 +178,6 @@ function DirectAttendanceReport() {
   const courseId = parseInt(params.courseId as string);
 
   const [attendanceData, setAttendanceData] = useState<AttendanceTableData | null>(null);
-  const [rawData, setRawData] = useState<DirectAttendanceResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [courseName, setCourseName] = useState<string>('');
@@ -203,7 +203,6 @@ function DirectAttendanceReport() {
             if (cacheAge < 5 * 60 * 1000) {
               console.log('✅ Using cached attendance data');
               setAttendanceData(cachedData.attendanceData);
-              setRawData(cachedData.rawData);
               setCourseName(cachedData.courseName);
               setValidationWarnings(cachedData.validationWarnings || []);
               setLastUpdated(new Date(cachedData.timestamp));
@@ -299,15 +298,7 @@ function DirectAttendanceReport() {
       const tableData = transformSessionsToTable(sessionsResponse.sessions, fetchedCourseName);
       setAttendanceData(tableData);
       
-      const rawDataObj = {
-        success: true,
-        courseId,
-        totalStudents: tableData.students.length,
-        attendanceData: [],
-        rawResponse: sessionsResponse,
-        courseName: fetchedCourseName
-      };
-      setRawData(rawDataObj);
+      
       
       const now = new Date();
       setLastUpdated(now);
@@ -316,7 +307,6 @@ function DirectAttendanceReport() {
       try {
         localStorage.setItem(cacheKey, JSON.stringify({
           attendanceData: tableData,
-          rawData: rawDataObj,
           courseName: fetchedCourseName,
           validationWarnings: validation.warnings,
           timestamp: now.getTime()
@@ -385,60 +375,10 @@ function DirectAttendanceReport() {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-green-50 via-white to-green-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleBack}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {courseName || `Course ${courseId}`} - Direct Attendance
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  {rawData ? `${rawData.totalStudents} students` : ''} • Direct from Gradebook
-                  {lastUpdated && (
-                    <span className="ml-2 text-sm text-gray-500">
-                      • Last updated: {lastUpdated.toLocaleTimeString()}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Refresh data"
-              >
-                <svg 
-                  className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                {isRefreshing ? 'Refreshing...' : 'Refresh'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navigation 
+        title={courseName ? `${courseName} ` : `Course ${courseId}`} 
+        showBackButton={true} 
+      />
 
       {/* Validation Warnings */}
       {validationWarnings.length > 0 && (
@@ -473,64 +413,7 @@ function DirectAttendanceReport() {
           <>
           {/* Attendance Table */}
             <AttendanceTable data={attendanceData} />
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-3">
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Students</p>
-                    <p className="text-2xl font-bold text-gray-900">{attendanceData.students.length}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Avg Attendance</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {Math.round(attendanceData.students.reduce((sum, student) => sum + student.totalPresent, 0) / attendanceData.students.length)}%
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-xl shadow-md p-6">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Data Source</p>
-                    <p className="text-2xl font-bold text-gray-900">Gradebook</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            
-            
-            {/* Debug Info */}
-            {process.env.NODE_ENV === 'development' && rawData && (
-              <div className="mt-8 bg-gray-50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold mb-4">Debug: Raw Gradebook Data</h3>
-                <pre className="text-sm text-gray-600 overflow-auto max-h-96">
-                  {JSON.stringify(rawData, null, 2)}
-                </pre>
-              </div>
-            )}
+         
           </>
         )}
       </main>

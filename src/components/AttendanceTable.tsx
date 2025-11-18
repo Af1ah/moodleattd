@@ -30,11 +30,11 @@ const getCurrentWeekRange = (): DateRange => {
 };
 
 const statusColors: Record<AttendanceStatus, string> = {
-  'P': 'bg-green-100 text-green-800',
-  'A': 'bg-red-100 text-red-800',
-  'L': 'bg-yellow-100 text-yellow-800',
-  'E': 'bg-blue-100 text-blue-800',
-  '-': 'bg-gray-100 text-gray-600',
+  'P': 'bg-green-50 text-green-700 border border-green-200',
+  'A': 'bg-red-50 text-red-600 border border-red-100',
+  'L': 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+  'E': 'bg-blue-50 text-blue-700 border border-blue-200',
+  '-': 'bg-gray-50 text-gray-500 border border-gray-100',
 };
 
 const statusLabels: Record<AttendanceStatus, string> = {
@@ -448,7 +448,7 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
             <div className="flex gap-2">
               <button
                 onClick={() => setShowFilters(true)}
-                className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-md hover:shadow-lg active:scale-98 transform"
+                className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -466,7 +466,7 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                 <button
                   onClick={() => setShowDownloadMenu(!showDownloadMenu)}
                   disabled={isDownloading || visibleSessionDates.length === 0}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors shadow-md hover:shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400"
                   title="Download filtered data"
                 >
                   {isDownloading ? (
@@ -528,7 +528,7 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
             {baseUrl && (
               <button
                 onClick={() => setShowSettings(true)}
-                className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 active:bg-gray-800 transition-colors shadow-md hover:shadow-lg"
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm"
                 title="Settings - Configure field mappings"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -540,14 +540,11 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
             </div>
             
             {/* Date Range Display */}
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-2 px-4 py-2 bg-white text-sm text-gray-700 border border-gray-200 rounded-lg">
+              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
               <span className="font-medium">
-                {dateRange.option === 'week' && 'Current Week: '}
-                {dateRange.option === 'month' && 'Current Month: '}
-                {dateRange.option === 'custom' && 'Custom Range: '}
                 <span className="text-gray-900">
                   {new Date(dateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   {' - '}
@@ -629,7 +626,8 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                 {visibleSessionDates.map((dateGroup, dateIndex) => (
                 <th
                   key={dateIndex}
-                  colSpan={sessionBasedTracking ? 1 : dateGroup.sessions.length}
+                  colSpan={dateGroup.sessions.length}
+                  rowSpan={sessionBasedTracking ? 1 : undefined}
                   className="px-3 py-2 text-center text-xs font-bold text-gray-800 uppercase tracking-wider border-r border-gray-300"
                 >
                   {new Date(dateGroup.date).toLocaleDateString('en-US', {
@@ -677,13 +675,11 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                   dateGroup.sessions.map((session, sessionIndex) => (
                     <th
                       key={`${dateIndex}-${sessionIndex}`}
-                      className={`px-2 py-2 text-center text-xs font-medium text-gray-700 border-r border-gray-200 ${
-                        courseColorMap.get(session.sessionName)
-                      }`}
+                      className="px-3 py-3 text-center text-xs font-medium text-gray-700"
                     >
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{session.time}</span>
-                        <span className="text-[10px] mt-0.5 truncate max-w-20" title={session.sessionName}>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-semibold">{session.time.replace(':00:00', ':00').replace(' AM', 'AM').replace(' PM', 'PM')}</span>
+                        <span className="text-[10px] text-gray-500 truncate max-w-20" title={session.sessionName}>
                           {session.sessionName}
                         </span>
                       </div>
@@ -696,8 +692,8 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
           <tbody className="bg-white divide-y divide-gray-200">
             {studentsWithSessionTracking.map((student, studentIndex) => {
               return (
-                <tr key={studentIndex} className="hover:bg-blue-50">
-                  <td className="sticky left-0 z-10 px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-white border-r border-gray-300">
+                <tr key={studentIndex} className="hover:bg-gray-50">
+                  <td className="sticky left-0 z-10 px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-white">
                     {student.studentName}
                   </td>
                   {visibleSessionDates.map((dateGroup, dateIndex) => {
@@ -705,19 +701,19 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                     if (sessionBasedTracking) {
                       const dayAttendance = calculateDayAttendance(dateGroup, student.sessions);
                       const displayValue = dayAttendance === 0 ? 'A' : dayAttendance === 0.5 ? 'H' : dayAttendance === 1 ? 'P' : '-';
-                      const bgColor = dayAttendance === 1 ? 'bg-green-100 text-green-800' : 
-                                     dayAttendance === 0.5 ? 'bg-yellow-100 text-yellow-800' : 
-                                     dayAttendance === 0 ? 'bg-red-100 text-red-800' : 
-                                     'bg-gray-100 text-gray-600';
+                      const bgColor = dayAttendance === 1 ? 'bg-green-50 text-green-700 border border-green-200' : 
+                                     dayAttendance === 0.5 ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 
+                                     dayAttendance === 0 ? 'bg-red-50 text-red-600 border border-red-100' : 
+                                     'bg-gray-50 text-gray-500 border border-gray-100';
                       
                       return (
                         <td
                           key={dateIndex}
                           colSpan={dateGroup.sessions.length}
-                          className="px-2 py-4 whitespace-nowrap text-center border-r border-gray-200"
+                          className="px-3 py-4 whitespace-nowrap text-center"
                         >
                           <span
-                            className={`inline-flex items-center justify-center px-3 py-1 text-xs font-semibold rounded ${bgColor}`}
+                            className={`inline-flex items-center justify-center px-3 py-1 text-xs font-bold rounded-full ${bgColor}`}
                             title={`${displayValue === 'P' ? 'Full Day Present' : displayValue === 'H' ? 'Half Day (0.5)' : displayValue === 'A' ? 'Absent' : 'N/A'} - ${dateGroup.date}`}
                           >
                             {displayValue === 'H' ? '0.5' : displayValue}
@@ -732,12 +728,10 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
                       return (
                         <td
                           key={`${dateIndex}-${sessionIndex}`}
-                          className={`px-2 py-4 whitespace-nowrap text-center border-r border-gray-200 ${
-                            courseColorMap.get(session.sessionName)
-                          }`}
+                          className="px-3 py-4 whitespace-nowrap text-center"
                         >
                           <span
-                            className={`inline-flex items-center justify-center px-2 py-1 text-xs font-semibold rounded ${statusColors[status]}`}
+                            className={`inline-flex items-center justify-center px-3 py-1 text-xs font-bold rounded-full ${statusColors[status]}`}
                             title={`${statusLabels[status]} - ${session.sessionName} at ${session.time}`}
                           >
                             {status}
@@ -774,19 +768,19 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
               {sessionBasedTracking ? (
                 <>
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 rounded font-semibold bg-green-100 text-green-800">
+                    <span className="px-3 py-1 rounded-full font-bold text-xs bg-green-50 text-green-700 border border-green-200">
                       P
                     </span>
                     <span className="text-gray-700">Full Day Present (1)</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 rounded font-semibold bg-yellow-100 text-yellow-800">
+                    <span className="px-3 py-1 rounded-full font-bold text-xs bg-yellow-50 text-yellow-700 border border-yellow-200">
                       0.5
                     </span>
                     <span className="text-gray-700">Half Day (0.5)</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 rounded font-semibold bg-red-100 text-red-800">
+                    <span className="px-3 py-1 rounded-full font-bold text-xs bg-red-50 text-red-600 border border-red-100">
                       A
                     </span>
                     <span className="text-gray-700">Absent (0)</span>

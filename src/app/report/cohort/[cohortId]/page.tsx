@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import AttendanceTable from '@/components/AttendanceTable';
+import Navigation from '@/components/Navigation';
 import { ProtectedRoute, useAuth } from '@/components/AuthProvider';
 import { AttendanceTableData } from '@/types/moodle';
 
@@ -299,7 +300,7 @@ function IndividualCohortAttendanceReport() {
   if (isLoading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-200 border-t-purple-600 mb-6"></div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Cohort Report</h2>
@@ -313,7 +314,7 @@ function IndividualCohortAttendanceReport() {
   if (error || !cohort) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50 p-4">
+        <div className="min-h-screen bg-gray-100 p-4">
           <div className="max-w-4xl mx-auto">
             <div className="bg-white rounded-lg shadow-md p-8 text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -348,57 +349,11 @@ function IndividualCohortAttendanceReport() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleBackToCohorts}
-                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Back to reports"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <div className="w-12 h-12 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    {cohort.name}
-                  </h1>
-                  <p className="text-gray-600 mt-1">
-                    Class attendance report
-                    {cohort.idnumber && ` • ${cohort.idnumber}`}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleRefresh}
-                  disabled={isLoading}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
-                  title="Refresh data"
-                >
-                  <svg 
-                    className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`}
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  {isLoading ? 'Loading...' : 'Refresh'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
+      <div className="min-h-screen bg-gray-100">
+        <Navigation 
+          title={`${cohort.name}${cohort.idnumber ? ` • ${cohort.idnumber}` : ''}`} 
+          showBackButton={true} 
+        />
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

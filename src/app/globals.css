@@ -1,7 +1,8 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
 :root {
-  --background: #ffffff;
+  --background: #F3F4F6; /* lighter gray so white cards stand out */
   --foreground: #171717;
 }
 
@@ -15,7 +16,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* Mobile modal improvements */
@@ -48,4 +49,56 @@ body.modal-open {
 
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
+}
+
+/* Sticky header optimizations */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: white;
+}
+
+/* Mobile touch optimizations */
+@media (max-width: 768px) {
+  /* Better tap targets on mobile */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Optimize sticky header for mobile */
+  .sticky-header {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Prevent text from being too small on mobile */
+  body {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+}
+
+/* Smooth scrolling for page content under sticky header */
+html {
+  scroll-padding-top: 80px; /* Height of sticky header + padding */
+}
+
+/* Improve mobile menu animations */
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.mobile-menu-animate {
+  animation: slide-down 0.2s ease-out;
 }

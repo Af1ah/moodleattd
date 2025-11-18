@@ -4,31 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { ProtectedRoute } from '@/components/AuthProvider';
 import { LTISessionData } from '@/lib/session';
-import FilterModal, { DateRange } from '@/components/FilterModal';
-
-interface StudentAttendanceSession {
-  sessionId: string;
-  sessionDate: string;
-  sessionTime: string;
-  attendanceName: string;
-  status: 'P' | 'A' | 'L' | 'E' | '-';
-  statusDescription: string;
-}
-
-interface AttendanceRegisterData {
-  studentId: string;
-  studentName: string;
-  courseName: string;
-  attendanceActivities: string[]; // List of unique attendance activity names
-  sessionDates: string[]; // List of unique session dates
-  attendanceMatrix: { [activityName: string]: { [date: string]: StudentAttendanceSession[] } }; // Matrix of activities x dates with arrays for multiple sessions
-  totalPresent: number;
-  totalAbsent: number;
-  totalLate: number;
-  totalExcused: number;
-  totalSessions: number;
-  attendancePercentage: number;
-}
+import AttendanceTable from '@/components/AttendanceTable';
+import { AttendanceTableData } from '@/types/moodle';
 
 interface AttendanceLog {
   studentid: number;
@@ -48,24 +25,128 @@ interface AttendanceSessionData {
   statuses?: AttendanceStatus[];
 }
 
+interface SessionInfo {
+  sessionId: string;
+  sessionName: string;
+  time: string;
+  date: string;
+  timestamp: number;
+  courseId: number;
+  courseName: string;
+}
+
+// Transform attendance data for a single student into AttendanceTableData format
+const transformDataForStudent = (sessions: AttendanceSessionData[], session: LTISessionData, courseId: string): AttendanceTableData => {
+  const sessionDatesMap = new Map<string, { timestamp: number; sessions: SessionInfo[] }>();
+  const attendanceMap = new Map<string, 'P' | 'A' | 'L' | 'E' | '-'>();
+  
+  let totalPresent = 0;
+  let totalAbsent = 0;
+  let totalLate = 0;
+  let totalExcused = 0;
+
+  sessions.forEach((sessionData) => {
+    const sessionDate = new Date(sessionData.sessdate * 1000).toISOString().split('T')[0];
+    const sessionTime = new Date(sessionData.sessdate * 1000).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    const attendanceName = sessionData.attendanceName || session.courseName || 'Unknown';
+    const sessionId = `${sessionDate}_${sessionTime}_${attendanceName}`;
+
+    // Find current student's attendance for this session
+    let status: 'P' | 'A' | 'L' | 'E' | '-' = '-';
+
+    // Look for the current student in the attendance log
+    const studentLog = sessionData.attendance_log?.find((log: AttendanceLog) => 
+      log.studentid.toString() === session.userId
+    );
+
+    if (studentLog) {
+      // Find status description
+      const statusDef = sessionData.statuses?.find((s: AttendanceStatus) => 
+        s.id.toString() === studentLog.statusid.toString()
+      );
+      
+      if (statusDef) {
+        status = statusDef.acronym as 'P' | 'A' | 'L' | 'E' | '-';
+        
+        // Count attendance
+        switch (status) {
+          case 'P': totalPresent++; break;
+          case 'A': totalAbsent++; break;
+          case 'L': totalLate++; break;
+          case 'E': totalExcused++; break;
+        }
+      }
+    }
+
+    // Add to session dates map
+    if (!sessionDatesMap.has(sessionDate)) {
+      sessionDatesMap.set(sessionDate, {
+        timestamp: sessionData.sessdate,
+        sessions: []
+      });
+    }
+    
+    sessionDatesMap.get(sessionDate)!.sessions.push({
+      sessionId,
+      sessionName: attendanceName,
+      time: sessionTime,
+      date: sessionDate,
+      timestamp: sessionData.sessdate,
+      courseId: parseInt(courseId),
+      courseName: session.courseName || 'Unknown Course'
+    });
+
+    attendanceMap.set(sessionId, status);
+  });
+
+  // Create sessionDates array
+  const sessionDates = Array.from(sessionDatesMap.keys())
+    .sort()
+    .map(date => ({
+      date,
+      timestamp: sessionDatesMap.get(date)!.timestamp,
+      sessions: sessionDatesMap.get(date)!.sessions.sort((a, b) => a.time.localeCompare(b.time))
+    }));
+
+  const totalSessions = sessions.length;
+  const sessionsRecord: Record<string, 'P' | 'A' | 'L' | 'E' | '-'> = {};
+  attendanceMap.forEach((status, sessionId) => {
+    sessionsRecord[sessionId] = status;
+  });
+
+  // Create student data
+  const students = [{
+    id: parseInt(session.userId),
+    studentName: session.userName,
+    courseName: session.courseName || 'Unknown Course',
+    email: '',
+    username: '',
+    idnumber: null,
+    attendance: attendanceMap,
+    sessions: sessionsRecord,
+    totalPresent,
+    totalAbsent,
+    totalLate,
+    totalExcused,
+    totalSessions,
+  }];
+
+  return { students, sessionDates };
+};
+
 function StudentAttendancePage() {
   const params = useParams();
   const courseId = params.courseId as string;
   
-  const [attendanceData, setAttendanceData] = useState<AttendanceRegisterData | null>(null);
+  const [attendanceData, setAttendanceData] = useState<AttendanceTableData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ltiSession, setLtiSession] = useState<LTISessionData | null>(null);
-  
-  // Filter modal state
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange>({
-    option: 'month',
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]
-  });
-  const [selectedActivities, setSelectedActivities] = useState<Set<string>>(new Set());
-  const [hideNonTakenSessions, setHideNonTakenSessions] = useState(false);
 
   // Fetch LTI session
   const fetchLTISession = useCallback(async () => {
@@ -84,7 +165,7 @@ function StudentAttendancePage() {
     }
   }, []);
 
-  // Fetch student attendance data
+  // Fetch student attendance data using the same logic as all-courses page
   const fetchStudentAttendance = useCallback(async (session: LTISessionData) => {
     if (!session) return;
 
@@ -92,55 +173,75 @@ function StudentAttendancePage() {
     setError(null);
 
     try {
-      // For LTI users, use session token; for manual users, use localStorage
-      const userToken = session.moodleToken || localStorage.getItem('moodleToken');
+      console.log('👤 Fetching attendance for student:', session.userId, 'course:', courseId);
       
-      if (!userToken) {
-        setError('Please login to view your attendance data');
-        return;
-      }
-
-      // Get attendance data from database (faster) - NEW METHOD
-      const response = await fetch('/api/getAttendanceDB', {
+      // Use the same API as student-all-courses page (no date restrictions)
+      const response = await fetch('/api/getStudentAllCoursesAttendance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          courseId: parseInt(courseId),
-          filterStudentId: session.userId, // Filter for current student only
+          studentId: parseInt(session.userId),
+          courseIds: [parseInt(courseId)], // Single course from LTI launch
+          // No datefrom/dateto - fetch all data
         }),
       });
-      
-      // OLD METHOD (commented out - using Moodle API)
-      // const response = await fetch('/api/getAttendanceDirect', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({
-      //     courseId: parseInt(courseId),
-      //     userToken: userToken,
-      //     filterStudentId: session.userId,
-      //   }),
-      // });
 
       if (!response.ok) {
         throw new Error('Failed to fetch attendance data');
       }
 
       const result = await response.json();
+      console.log('✅ Attendance data received:', result);
       
-      if (!result.success) {
-        throw new Error(result.note || 'Failed to fetch attendance data');
+      if (!result.success || !result.courses || result.courses.length === 0) {
+        console.log('⚠️ No attendance data found for this course');
+        setAttendanceData({ students: [], sessionDates: [] });
+        return;
       }
 
-      // Filter and transform data for the current student only
-      const transformedData = transformDataForStudent(result.sessions, session);
-      setAttendanceData(transformedData);
+      // Extract the single course data
+      const courseData = result.courses[0];
+      console.log(`📊 Found ${courseData.sessions.length} sessions for course ${courseData.courseName}`);
+
+      // Transform sessions to the format expected by transformDataForStudent
+      // Map status acronyms to IDs: P=1, A=2, L=3, E=4, -=0
+      const statusToId: Record<string, number> = { 'P': 1, 'A': 2, 'L': 3, 'E': 4, '-': 0 };
       
-      // Initialize selected activities with all activities
-      setSelectedActivities(new Set(transformedData.attendanceActivities));
+      const sessions: AttendanceSessionData[] = courseData.sessions.map((s: {
+        sessionId: string;
+        sessionDate: string;
+        sessionTime: string;
+        attendanceName: string;
+        status: string;
+        statusDescription: string;
+      }) => {
+        // Parse date and time to get timestamp
+        const dateTime = new Date(`${s.sessionDate} ${s.sessionTime}`);
+        const timestamp = Math.floor(dateTime.getTime() / 1000);
+        
+        const statusId = statusToId[s.status] || 0;
+        
+        return {
+          sessdate: timestamp,
+          attendanceName: s.attendanceName,
+          attendance_log: [{
+            studentid: parseInt(session.userId),
+            statusid: statusId.toString(),
+          }],
+          statuses: [{
+            id: statusId,
+            acronym: s.status,
+            description: s.statusDescription,
+          }],
+        };
+      });
+
+      // Filter and transform data for the current student only
+      const transformedData = transformDataForStudent(sessions, session, courseId);
+      console.log('✅ Transformed data:', transformedData);
+      setAttendanceData(transformedData);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
@@ -149,105 +250,6 @@ function StudentAttendancePage() {
       setIsLoading(false);
     }
   }, [courseId]);
-
-  // Transform attendance data for a single student into register format
-  const transformDataForStudent = (sessions: AttendanceSessionData[], session: LTISessionData): AttendanceRegisterData => {
-    const attendanceMatrix: { [activityName: string]: { [date: string]: StudentAttendanceSession[] } } = {};
-    const attendanceActivitiesSet = new Set<string>();
-    const sessionDatesSet = new Set<string>();
-    
-    let totalPresent = 0;
-    let totalAbsent = 0;
-    let totalLate = 0;
-    let totalExcused = 0;
-
-    sessions.forEach((sessionData) => {
-      const sessionDate = new Date(sessionData.sessdate * 1000).toISOString().split('T')[0];
-      const sessionTime = new Date(sessionData.sessdate * 1000).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      });
-      
-      const attendanceName = sessionData.attendanceName || session.courseName || 'Unknown';
-      const sessionId = `${sessionDate}_${sessionTime}_${attendanceName}`;
-
-      // Add to sets for tracking unique activities and dates
-      attendanceActivitiesSet.add(attendanceName);
-      sessionDatesSet.add(sessionDate);
-
-      // Find current student's attendance for this session
-      let status: 'P' | 'A' | 'L' | 'E' | '-' = '-';
-      let statusDescription = 'Not marked';
-
-      // Look for the current student in the attendance log
-      const studentLog = sessionData.attendance_log?.find((log: AttendanceLog) => 
-        log.studentid.toString() === session.userId
-      );
-
-      if (studentLog) {
-        // Find status description
-        const statusDef = sessionData.statuses?.find((s: AttendanceStatus) => 
-          s.id.toString() === studentLog.statusid.toString()
-        );
-        
-        if (statusDef) {
-          status = statusDef.acronym as 'P' | 'A' | 'L' | 'E' | '-';
-          statusDescription = statusDef.description;
-          
-          // Count attendance
-          switch (status) {
-            case 'P': totalPresent++; break;
-            case 'A': totalAbsent++; break;
-            case 'L': totalLate++; break;
-            case 'E': totalExcused++; break;
-          }
-        }
-      }
-
-      // Create session object
-      const studentSession: StudentAttendanceSession = {
-        sessionId,
-        sessionDate,
-        sessionTime,
-        attendanceName,
-        status,
-        statusDescription
-      };
-
-      // Initialize matrix structure
-      if (!attendanceMatrix[attendanceName]) {
-        attendanceMatrix[attendanceName] = {};
-      }
-      if (!attendanceMatrix[attendanceName][sessionDate]) {
-        attendanceMatrix[attendanceName][sessionDate] = [];
-      }
-      
-      // Add session to the matrix (sorted by time)
-      attendanceMatrix[attendanceName][sessionDate].push(studentSession);
-      attendanceMatrix[attendanceName][sessionDate].sort((a: StudentAttendanceSession, b: StudentAttendanceSession) => a.sessionTime.localeCompare(b.sessionTime));
-    });
-
-    const attendanceActivities = Array.from(attendanceActivitiesSet).sort();
-    const sessionDates = Array.from(sessionDatesSet).sort();
-    const totalSessions = sessions.length;
-    const attendancePercentage = totalSessions > 0 ? Math.round((totalPresent / totalSessions) * 100) : 0;
-
-    return {
-      studentId: session.userId,
-      studentName: session.userName,
-      courseName: session.courseName || 'Unknown Course',
-      attendanceActivities,
-      sessionDates,
-      attendanceMatrix,
-      totalPresent,
-      totalAbsent,
-      totalLate,
-      totalExcused,
-      totalSessions,
-      attendancePercentage
-    };
-  };
 
   useEffect(() => {
     const initializeData = async () => {
@@ -293,9 +295,9 @@ function StudentAttendancePage() {
     );
   }
 
-  if (!attendanceData) {
+  if (!attendanceData || !attendanceData.students || attendanceData.students.length === 0) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center text-gray-500">
           <p>No attendance data available</p>
         </div>
@@ -303,366 +305,61 @@ function StudentAttendancePage() {
     );
   }
 
-  // Apply date range filtering to attendance data
-  const getFilteredAttendanceData = () => {
-    if (!attendanceData) return null;
-
-    // Filter session dates based on date range
-    const filteredSessionDates = attendanceData.sessionDates.filter((date) => {
-      const sessionDate = new Date(date);
-      const startDate = new Date(dateRange.startDate);
-      const endDate = new Date(dateRange.endDate);
-      return sessionDate >= startDate && sessionDate <= endDate;
-    });
-
-    // If hiding non-taken days, only show dates that have at least one session
-    const visibleSessionDates = hideNonTakenSessions 
-      ? filteredSessionDates.filter((date) => {
-          return attendanceData.attendanceActivities.some(activity => 
-            attendanceData.attendanceMatrix[activity]?.[date]?.length > 0
-          );
-        })
-      : filteredSessionDates;
-
-    // Rebuild attendance matrix with filtered dates
-    const filteredAttendanceMatrix: { [activityName: string]: { [date: string]: StudentAttendanceSession[] } } = {};
-    let filteredTotalPresent = 0;
-    let filteredTotalAbsent = 0;
-    let filteredTotalLate = 0;
-    let filteredTotalExcused = 0;
-    let filteredTotalSessions = 0;
-
-    attendanceData.attendanceActivities.forEach((activity) => {
-      filteredAttendanceMatrix[activity] = {};
-      visibleSessionDates.forEach((date) => {
-        const sessions = attendanceData.attendanceMatrix[activity]?.[date] || [];
-        if (sessions.length > 0) {
-          filteredAttendanceMatrix[activity][date] = sessions;
-          
-          // Count attendance for filtered sessions
-          sessions.forEach((session) => {
-            filteredTotalSessions++;
-            switch (session.status) {
-              case 'P': filteredTotalPresent++; break;
-              case 'A': filteredTotalAbsent++; break;
-              case 'L': filteredTotalLate++; break;
-              case 'E': filteredTotalExcused++; break;
-            }
-          });
-        } else if (!hideNonTakenSessions) {
-          // Include empty days if not hiding them
-          filteredAttendanceMatrix[activity][date] = [];
-        }
-      });
-    });
-
-    const filteredAttendancePercentage = filteredTotalSessions > 0 
-      ? Math.round((filteredTotalPresent / filteredTotalSessions) * 100) 
-      : 0;
-
-    return {
-      ...attendanceData,
-      sessionDates: visibleSessionDates,
-      attendanceMatrix: filteredAttendanceMatrix,
-      totalPresent: filteredTotalPresent,
-      totalAbsent: filteredTotalAbsent,
-      totalLate: filteredTotalLate,
-      totalExcused: filteredTotalExcused,
-      totalSessions: filteredTotalSessions,
-      attendancePercentage: filteredAttendancePercentage,
-    };
-  };
-
-  const filteredAttendanceData = getFilteredAttendanceData();
-
-  if (!filteredAttendanceData) {
-    return (
-      <div className="min-h-screen bg-linear-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <p>No attendance data available for the selected date range</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-blue-50">
+      <div className="min-h-screen bg-gray-100">
         <main className="container mx-auto px-4 py-8">
-          {/* Header with Filter Button */}
+          {/* Header */}
           <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex shrink-0 items-center justify-center">
                 <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">My Attendance Register</h1>
+                <h1 className="text-3xl font-bold text-gray-900">My Attendance</h1>
                 <p className="text-gray-600 mt-1">
-                  {filteredAttendanceData.courseName} • {filteredAttendanceData.studentName}
+                  {ltiSession?.courseName}
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              <a
-                href="/student-all-courses"
-                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                <span className="text-sm font-medium">All Courses</span>
-              </a>
-              
-              <button
-                onClick={() => setIsFilterModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
-              >
-                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                <span className="text-sm font-medium text-gray-700">Filter</span>
-              </button>
-            </div>
+            <a
+              href="/student-all-courses"
+              className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              <span className="text-sm font-medium">All Courses</span>
+            </a>
           </div>
 
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Present</p>
-                  <p className="text-2xl font-bold text-green-600">{filteredAttendanceData.totalPresent}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Absent</p>
-                  <p className="text-2xl font-bold text-red-600">{filteredAttendanceData.totalAbsent}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Late</p>
-                  <p className="text-2xl font-bold text-yellow-600">{filteredAttendanceData.totalLate}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Excused</p>
-                  <p className="text-2xl font-bold text-blue-600">{filteredAttendanceData.totalExcused}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <div className="flex items-center">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Attendance</p>
-                  <p className="text-2xl font-bold text-purple-600">{filteredAttendanceData.attendancePercentage}%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Attendance Register Table */}
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Attendance Register</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Showing {selectedActivities.size} activities across {filteredAttendanceData.sessionDates.length} dates
-              </p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 border-r border-gray-200">
-                      Activity
-                    </th>
-                    {filteredAttendanceData.sessionDates.map((date) => (
-                      <th key={date} className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider min-w-20">
-                        <div className="flex flex-col">
-                          <span>{new Date(date).toLocaleDateString('en-US', { month: 'short' })}</span>
-                          <span className="font-bold">{new Date(date).getDate()}</span>
-                          <span className="text-[10px]">{new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredAttendanceData.attendanceActivities
-                    .filter(activity => selectedActivities.has(activity))
-                    .map((activity, index) => (
-                    <tr key={activity} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-4 py-4 text-sm font-medium text-gray-900 sticky left-0 bg-inherit z-10 border-r border-gray-200 max-w-[200px]">
-                        <div className="truncate" title={activity}>
-                          {activity}
-                        </div>
-                      </td>
-                      {filteredAttendanceData.sessionDates.map((date) => {
-                        const sessions = filteredAttendanceData.attendanceMatrix[activity]?.[date] || [];
-                        
-                        if (sessions.length === 0) {
-                          // No sessions for this activity on this date
-                          return (
-                            <td key={`${activity}-${date}`} className="px-3 py-4 text-center">
-                              <div className="flex flex-col items-center">
-                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold bg-gray-100 text-gray-400">
-                                  -
-                                </span>
-                              </div>
-                            </td>
-                          );
-                        }
-
-                        if (sessions.length === 1) {
-                          // Single session for this activity on this date
-                          const session = sessions[0];
-                          const status = session.status || '-';
-                          
-                          return (
-                            <td key={`${activity}-${date}`} className="px-3 py-4 text-center">
-                              <div className="flex flex-col items-center">
-                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
-                                  status === 'P' ? 'bg-green-100 text-green-800' :
-                                  status === 'A' ? 'bg-red-100 text-red-800' :
-                                  status === 'L' ? 'bg-yellow-100 text-yellow-800' :
-                                  status === 'E' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-400'
-                                }`}>
-                                  {status}
-                                </span>
-                                {session.sessionTime && (
-                                  <span className="text-[10px] text-gray-500 mt-1">
-                                    {session.sessionTime}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        }
-
-                        // Multiple sessions for this activity on this date
-                        return (
-                          <td key={`${activity}-${date}`} className="px-3 py-4 text-center">
-                            <div className="flex flex-row flex-wrap justify-center gap-1">
-                              {sessions.map((session, idx) => (
-                                <div key={idx} className="flex flex-col items-center">
-                                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold ${
-                                    session.status === 'P' ? 'bg-green-100 text-green-800' :
-                                    session.status === 'A' ? 'bg-red-100 text-red-800' :
-                                    session.status === 'L' ? 'bg-yellow-100 text-yellow-800' :
-                                    session.status === 'E' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-gray-100 text-gray-400'
-                                  }`}>
-                                    {session.status}
-                                  </span>
-                                  <span className="text-[8px] text-gray-500 mt-0.5">
-                                    {session.sessionTime.split(' ')[0]}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Attendance Table */}
+          <AttendanceTable data={attendanceData} />
 
           {/* LTI Session Info */}
           {ltiSession && (
-            <div className="mt-8 bg-blue-50 rounded-xl p-6">
-              <h3 className="text-lg font-semibold mb-4 text-blue-900">Session Information</h3>
+            <div className="mt-8 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-6">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900">Session Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-medium text-blue-800">Student:</span>
-                  <span className="ml-2 text-blue-700">{ltiSession.userName} ({ltiSession.userId})</span>
+                  <span className="font-medium text-gray-700">Student:</span>
+                  <span className="ml-2 text-gray-600">{ltiSession.userName} ({ltiSession.userId})</span>
                 </div>
                 <div>
-                  <span className="font-medium text-blue-800">Course:</span>
-                  <span className="ml-2 text-blue-700">{ltiSession.courseName} ({ltiSession.courseId})</span>
+                  <span className="font-medium text-gray-700">Course:</span>
+                  <span className="ml-2 text-gray-600">{ltiSession.courseName} ({ltiSession.courseId})</span>
                 </div>
                 <div>
-                  <span className="font-medium text-blue-800">Role:</span>
-                  <span className="ml-2 text-blue-700">{ltiSession.roleName || 'Student'}</span>
+                  <span className="font-medium text-gray-700">Role:</span>
+                  <span className="ml-2 text-gray-600">{ltiSession.roleName || 'Student'}</span>
                 </div>
               </div>
             </div>
           )}
         </main>
-        
-        {/* Filter Modal */}
-        <FilterModal
-          isOpen={isFilterModalOpen}
-          onClose={() => setIsFilterModalOpen(false)}
-          allCourses={attendanceData?.attendanceActivities || []}
-          selectedCourses={selectedActivities}
-          onToggleCourse={(activity) => {
-            const newSelected = new Set(selectedActivities);
-            if (newSelected.has(activity)) {
-              newSelected.delete(activity);
-            } else {
-              newSelected.add(activity);
-            }
-            setSelectedActivities(newSelected);
-          }}
-          onToggleAll={() => {
-            if (selectedActivities.size === attendanceData?.attendanceActivities.length) {
-              setSelectedActivities(new Set());
-            } else {
-              setSelectedActivities(new Set(attendanceData?.attendanceActivities || []));
-            }
-          }}
-          courseColorMap={new Map()} // We don't need colors for this view
-          sessionBasedTracking={false}
-          onToggleSessionTracking={() => {}} // Not applicable for student view
-          dateRange={dateRange}
-          onDateRangeChange={setDateRange}
-          hideNonTakenSessions={hideNonTakenSessions}
-          onToggleHideNonTaken={setHideNonTakenSessions}
-        />
       </div>
     </ProtectedRoute>
   );
