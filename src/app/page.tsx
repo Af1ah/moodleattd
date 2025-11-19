@@ -204,32 +204,8 @@ function MainContent() {
           </div>
         )}
 
-        {/* Class Based Reports - Loading State */}
-        {hasNonStudentRole && isLoadingCohorts && (
-          <div className="mb-6">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Class Reports</h2>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] p-4 sm:p-5 animate-pulse"
-                >
-                  <div className="flex items-start gap-3 sm:gap-4">
-                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gray-200"></div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Class Based Reports - Loaded State */}
-        {!isLoadingCohorts && hasNonStudentRole && hasAssignedCohorts && (
+        {/* Class Based Reports */}
+        {!isLoadingCourses && !isLoadingCohorts && !error && hasNonStudentRole && hasAssignedCohorts && (
           <div className="mb-6">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Class Reports</h2>
             
@@ -266,7 +242,7 @@ function MainContent() {
         )}
 
         {/* All Courses Report - For Students */}
-        {!isLoadingCourses && !error && role?.roleShortname === 'student' && (
+        {!isLoadingCourses && !isLoadingCohorts && !error && role?.roleShortname === 'student' && (
           <div className="mb-6">
             <button
               onClick={() => router.push('/student-all-courses')}
@@ -287,7 +263,7 @@ function MainContent() {
         )}
 
         {/* Course Selection */}
-        {!isLoadingCourses && !error && courses.length > 0 && (
+        {!isLoadingCourses && !isLoadingCohorts && !error && courses.length > 0 && (
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Select Course</h2>
             
@@ -322,15 +298,15 @@ function MainContent() {
         )}
 
         {/* Loading State */}
-        {isLoadingCourses && (
+        {(isLoadingCourses || (hasNonStudentRole && isLoadingCohorts)) && (
           <div className="flex flex-col items-center justify-center py-12 sm:py-20">
             <div className="inline-block animate-spin rounded-full h-12 w-12 sm:h-14 sm:w-14 border-4 border-gray-200 border-t-blue-600"></div>
-            <p className="mt-5 text-gray-600 text-base sm:text-lg font-medium">Loading courses...</p>
+            <p className="mt-5 text-gray-600 text-base sm:text-lg font-medium">Loading...</p>
           </div>
         )}
 
         {/* Empty State */}
-        {!isLoadingCourses && !error && courses.length === 0 && (
+        {!isLoadingCourses && !isLoadingCohorts && !error && courses.length === 0 && (
           <div className="text-center py-12 sm:py-20">
             <div className="w-18 h-18 sm:w-20 sm:h-20 bg-linear-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm">
               <ClipboardList className="w-9 h-9 sm:w-10 sm:h-10 text-gray-400" />
