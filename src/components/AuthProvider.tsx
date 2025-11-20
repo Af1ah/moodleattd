@@ -16,7 +16,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   isLtiUser: boolean;
-  login: (token: string, userId?: number, role?: RoleInfo) => void;
+  login: (token: string, userId?: number, role?: RoleInfo) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -119,7 +119,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [isAuthenticated, isLoading, pathname, router, token, isLtiUser]);
 
-  const login = (newToken: string, newUserId?: number, newRole?: RoleInfo) => {
+  const login = async (newToken: string, newUserId?: number, newRole?: RoleInfo) => {
     console.log('Login function called with token:', newToken);
     if (typeof window !== 'undefined') {
       localStorage.setItem('moodleToken', newToken);
@@ -130,6 +130,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.setItem('moodleRole', JSON.stringify(newRole));
       }
       console.log('Token and user info stored in localStorage');
+      
+      // Fetch and cache user details on login
+      try {
+        const response = await fetch('/api/moodle/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${newToken}`,
+          },
+          body: JSON.stringify({
+            wsfunction: 'core_webservice_get_site_info',
+            moodlewsrestformat: 'json',
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const userDetails = {
+            firstName: data.firstname || '',
+            lastName: data.lastname || '',
+            fullName: data.fullname || '',
+            username: data.username || '',
+            email: data.email || '',
+          };
+          localStorage.setItem('userDetails', JSON.stringify(userDetails));
+          console.log('✅ User details cached on login');
+        }
+      } catch (error) {
+        console.warn('Failed to cache user details on login:', error);
+      }
     }
     setToken(newToken);
     setUserId(newUserId || null);
@@ -160,13 +190,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Clear all storage and state
     if (typeof window !== 'undefined') {
-      // Clear specific localStorage items
+      // Clear specific localStorage items including new caches
       const keysToRemove = [
         'moodleToken', 
         'moodleUserId', 
         'moodleRole', 
         'isLtiUser', 
-        'courses_list'
+        'courses_list',
+        'userDetails',
+        'user_cohorts'
       ];
       keysToRemove.forEach(key => localStorage.removeItem(key));
       

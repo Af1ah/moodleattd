@@ -6,6 +6,7 @@ import AttendanceTable from '@/components/AttendanceTable';
 import Navigation from '@/components/Navigation';
 import { ProtectedRoute, useAuth } from '@/components/AuthProvider';
 import { AttendanceTableData } from '@/types/moodle';
+import { TableSkeleton } from '@/components/SkeletonLoading';
 
 // Cohort interface
 interface Cohort {
@@ -300,12 +301,31 @@ function IndividualCohortAttendanceReport() {
   if (isLoading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-purple-200 border-t-purple-600 mb-6"></div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Cohort Report</h2>
-            <p className="text-gray-600">Please wait while we fetch the attendance data...</p>
-          </div>
+        <div className="min-h-screen bg-gray-100">
+          <Navigation 
+            title={cohort ? `${cohort.name}${cohort.idnumber ? ` • ${cohort.idnumber}` : ''}` : 'Loading...'} 
+            showBackButton={true} 
+          />
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Summary Stats Skeleton */}
+            <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-xl shadow-sm p-6 animate-pulse">
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                    <div className="ml-4 flex-1">
+                      <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                      <div className="h-4 bg-gray-200 rounded w-20"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Table Skeleton */}
+            <TableSkeleton />
+          </main>
         </div>
       </ProtectedRoute>
     );

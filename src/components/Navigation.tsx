@@ -49,6 +49,30 @@ export default function Navigation({ title, showBackButton = false, icon }: Navi
     const fetchUserName = async () => {
       if (!userId) return;
       
+      // Check cache first
+      const cachedDetails = localStorage.getItem('userDetails');
+      if (cachedDetails) {
+        try {
+          const details = JSON.parse(cachedDetails);
+          if (details.firstName && details.lastName) {
+            setUserName(`${details.firstName} ${details.lastName}`);
+            console.log('✅ Using cached user details');
+            return;
+          } else if (details.fullName) {
+            setUserName(details.fullName);
+            console.log('✅ Using cached user details');
+            return;
+          } else if (details.username) {
+            setUserName(details.username);
+            console.log('✅ Using cached user details');
+            return;
+          }
+        } catch (e) {
+          console.warn('Failed to parse cached user details:', e);
+        }
+      }
+      
+      // Fetch from API if not cached
       try {
         const token = localStorage.getItem('moodleToken');
         if (!token) return;
@@ -67,6 +91,16 @@ export default function Navigation({ title, showBackButton = false, icon }: Navi
 
         if (response.ok) {
           const data = await response.json();
+          const userDetails = {
+            firstName: data.firstname || '',
+            lastName: data.lastname || '',
+            fullName: data.fullname || '',
+            username: data.username || '',
+            email: data.email || '',
+          };
+          // Cache the details
+          localStorage.setItem('userDetails', JSON.stringify(userDetails));
+          
           if (data.firstname && data.lastname) {
             setUserName(`${data.firstname} ${data.lastname}`);
           } else if (data.fullname) {
@@ -74,6 +108,7 @@ export default function Navigation({ title, showBackButton = false, icon }: Navi
           } else if (data.username) {
             setUserName(data.username);
           }
+          console.log('✅ User details fetched and cached');
         }
       } catch (error) {
         console.warn('Failed to fetch username:', error);

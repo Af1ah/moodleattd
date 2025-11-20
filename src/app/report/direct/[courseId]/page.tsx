@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/AuthProvider';
 import Navigation from '@/components/Navigation';
 import AttendanceTable from '@/components/AttendanceTable';
 import { AttendanceTableData } from '@/types/moodle';
+import { TableSkeleton } from '@/components/SkeletonLoading';
 
 interface DirectAttendanceData {
   userId: number;
@@ -342,11 +343,15 @@ function DirectAttendanceReport() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-green-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-green-200 border-t-green-600"></div>
-          <p className="mt-4 text-gray-600 font-medium">Loading direct attendance data...</p>
-        </div>
+      <div className="min-h-screen bg-linear-to-br from-green-50 via-white to-green-50">
+        <Navigation 
+          title={courseName || 'Loading...'} 
+          showBackButton={true} 
+        />
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <TableSkeleton />
+        </main>
       </div>
     );
   }

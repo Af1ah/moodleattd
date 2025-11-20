@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProtectedRoute, useAuth } from '@/components/AuthProvider';
 import Navigation from '@/components/Navigation';
+import { CardGridSkeleton } from '@/components/SkeletonLoading';
 import { 
   ClipboardList, 
   Users, 
@@ -39,6 +40,7 @@ function MainContent() {
   const [isLoadingCourses, setIsLoadingCourses] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [userCohorts, setUserCohorts] = useState<Cohort[]>([]);
+  const [isLoadingCohorts, setIsLoadingCohorts] = useState<boolean>(false);
   
   const hasNonStudentRole = role?.roleShortname !== 'student';
   const hasAssignedCohorts = userCohorts.length > 0;
@@ -120,12 +122,36 @@ function MainContent() {
   };
 
   // Fetch user's assigned cohorts
-  const fetchUserCohorts = useCallback(async () => {
+  const fetchUserCohorts = useCallback(async (useCache = true) => {
     if (!userId || !role || role.roleShortname === 'student') {
       return; // Skip for students or if no user info
     }
 
+    setIsLoadingCohorts(true);
     try {
+      const cacheKey = `user_cohorts_${userId}`;
+      
+      // Check cache first
+      if (useCache) {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached);
+            const cacheAge = Date.now() - cachedData.timestamp;
+            // Use cache if less than 10 minutes old
+            if (cacheAge < 10 * 60 * 1000) {
+              console.log('✅ Using cached cohorts data');
+              setUserCohorts(cachedData.cohorts);
+              setIsLoadingCohorts(false);
+              return;
+            }
+          } catch (e) {
+            console.warn('Failed to parse cached cohorts:', e);
+            localStorage.removeItem(cacheKey);
+          }
+        }
+      }
+
       const params = new URLSearchParams();
       params.append('userId', userId.toString());
       params.append('roleShortname', role.roleShortname);
@@ -133,11 +159,25 @@ function MainContent() {
       const response = await fetch(`/api/getCohorts?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
-        setUserCohorts(data.cohorts || []);
-        console.log(`✅ User has ${(data.cohorts || []).length} assigned cohorts`);
+        const cohorts = data.cohorts || [];
+        setUserCohorts(cohorts);
+        console.log(`✅ User has ${cohorts.length} assigned cohorts`);
+        
+        // Cache the data
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({
+            cohorts,
+            timestamp: Date.now()
+          }));
+          console.log('✅ Cached cohorts data');
+        } catch (e) {
+          console.warn('Failed to cache cohorts:', e);
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch user cohorts:', err);
+    } finally {
+      setIsLoadingCohorts(false);
     }
   }, [userId, role]);
 
@@ -158,11 +198,18 @@ function MainContent() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         {/* Cache Info Banner */}
-        {lastUpdated && !isLoadingCourses && (
+        {(lastUpdated || hasNonStudentRole) && !(isLoadingCourses && isLoadingCohorts) && (
           <div className="mb-4 sm:mb-6 flex items-center justify-end gap-3 text-xs text-gray-500">
-            <span className="whitespace-nowrap">Last updated: {lastUpdated.toLocaleTimeString()}</span>
+            {lastUpdated && (
+              <span className="whitespace-nowrap">Last updated: {lastUpdated.toLocaleTimeString()}</span>
+            )}
             <button
-              onClick={() => fetchCourses(false)}
+              onClick={() => {
+                fetchCourses(false);
+                if (hasNonStudentRole) {
+                  fetchUserCohorts(false);
+                }
+              }}
               title="Refresh"
               className="w-8 h-8 grid place-items-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
             >
@@ -200,8 +247,16 @@ function MainContent() {
           </div>
         )}
 
-        {/* Class Based Reports */}
-        {!isLoadingCourses && !error && hasNonStudentRole && hasAssignedCohorts && (
+        {/* Class Based Reports - Loading */}
+        {isLoadingCohorts && hasNonStudentRole && (
+          <div className="mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Class Reports</h2>
+            <CardGridSkeleton count={3} />
+          </div>
+        )}
+
+        {/* Class Based Reports - Loaded */}
+        {!isLoadingCohorts && !error && hasNonStudentRole && hasAssignedCohorts && (
           <div className="mb-6">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Class Reports</h2>
             
@@ -258,7 +313,15 @@ function MainContent() {
           </div>
         )}
 
-        {/* Course Selection */}
+        {/* Course Selection - Loading */}
+        {isLoadingCourses && (
+          <div>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Select Course</h2>
+            <CardGridSkeleton count={6} />
+          </div>
+        )}
+
+        {/* Course Selection - Loaded */}
         {!isLoadingCourses && !error && courses.length > 0 && (
           <div>
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Select Course</h2>
@@ -290,14 +353,6 @@ function MainContent() {
                 </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Loading State */}
-        {isLoadingCourses && (
-          <div className="flex flex-col items-center justify-center py-12 sm:py-20">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 sm:h-14 sm:w-14 border-4 border-gray-200 border-t-blue-600"></div>
-            <p className="mt-5 text-gray-600 text-base sm:text-lg font-medium">Loading courses...</p>
           </div>
         )}
 
