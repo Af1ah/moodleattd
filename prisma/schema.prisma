@@ -1,5 +1,11 @@
 // Prisma schema for Moodle attendance tables
-// Database connection string should be set in .env as DATABASE_URL
+// Database connection strings should be set in .env:
+// - DATABASE_URL: Connection through PgBouncer (add ?pgbouncer=true parameter)
+// - DIRECT_DATABASE_URL: Direct connection to PostgreSQL (for migrations)
+//
+// Example with PgBouncer:
+//   DATABASE_URL=postgresql://user:pass@localhost:6432/db?pgbouncer=true
+//   DIRECT_DATABASE_URL=postgresql://user:pass@localhost:5432/db
 
 generator client {
   provider = "prisma-client-js"

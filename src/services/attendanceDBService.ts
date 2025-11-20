@@ -8,6 +8,11 @@
 import { PrismaClient } from '@prisma/client';
 
 // Singleton pattern for Prisma Client
+// Prisma automatically detects PgBouncer from the ?pgbouncer=true parameter in DATABASE_URL
+// When detected, it:
+// - Disables prepared statements for transaction-level pooling
+// - Optimizes queries for pooled connections
+// - Uses DIRECT_DATABASE_URL for migrations and schema operations
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };

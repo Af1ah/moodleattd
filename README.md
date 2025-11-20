@@ -120,7 +120,8 @@ Create a `.env.local` file in the project root with the following variables:
 NEXT_PUBLIC_MOODLE_BASE_URL=https://your-moodle-site.com
 
 # Database Connections
-DATABASE_URL=postgresql://username:password@localhost:5432/moodle_db
+# For PgBouncer: Add ?pgbouncer=true to the DATABASE_URL
+DATABASE_URL=postgresql://username:password@localhost:6432/moodle_db?pgbouncer=true
 DIRECT_DATABASE_URL=postgresql://username:password@localhost:5432/moodle_db
 
 # Session Security
@@ -141,16 +142,27 @@ Your Moodle website URL (e.g., `https://moodle.yourschool.com`)
 PostgreSQL connection strings. Replace:
 - `username` - your PostgreSQL username
 - `password` - your PostgreSQL password
-- `localhost:5432` - your database host and port
+- `localhost:5432` - your database host and port (5432 for direct PostgreSQL, 6432 for PgBouncer)
 - `moodle_db` - your database name
 
-**Note:** If using PgBouncer (recommended for production):
-- `DATABASE_URL` - points to PgBouncer (pooled connection)
+**Important:** When using PgBouncer (recommended for production):
+- `DATABASE_URL` - points to PgBouncer (pooled connection) with `?pgbouncer=true` parameter
 - `DIRECT_DATABASE_URL` - points directly to PostgreSQL (for migrations and operations requiring direct connections)
+
+The `?pgbouncer=true` parameter is crucial as it tells Prisma to:
+- Use transaction-level connection pooling
+- Avoid using prepared statements that aren't compatible with PgBouncer's transaction mode
+- Optimize query execution for pooled connections
 
 Example with PgBouncer:
 ```env
-DATABASE_URL=postgresql://username:password@localhost:6432/moodle_db
+DATABASE_URL=postgresql://username:password@localhost:6432/moodle_db?pgbouncer=true
+DIRECT_DATABASE_URL=postgresql://username:password@localhost:5432/moodle_db
+```
+
+Example without PgBouncer (development):
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/moodle_db
 DIRECT_DATABASE_URL=postgresql://username:password@localhost:5432/moodle_db
 ```
 
