@@ -173,9 +173,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createLTISession } from '@/lib/session';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/services/attendanceDBService';
 
 // Helper to verify OAuth signature (basic LTI 1.0/1.1 security)
 async function verifyLTISignature(formData: FormData): Promise<boolean> {
@@ -351,7 +349,5 @@ export async function POST(request: NextRequest) {
       new URL('/login?error=lti_launch_failed', request.url),
       { status: 303 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
