@@ -13,6 +13,7 @@ Before installation, ensure you have:
 
 - **Node.js** version 18 or higher
 - **PostgreSQL** database (for storing user sessions and cached data)
+- **PgBouncer** (recommended for production) - connection pooler for PostgreSQL
 - **Moodle** instance with Web Services enabled
 - Administrator access to your Moodle site
 
@@ -43,6 +44,70 @@ bash setup_database.sh
 ```
 
 This will create necessary tables and indexes for the application.
+
+### 4. Setup PgBouncer (Recommended for Production)
+
+PgBouncer is a lightweight connection pooler for PostgreSQL that significantly improves performance and resource management.
+
+#### Install PgBouncer
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install pgbouncer
+```
+
+**macOS:**
+```bash
+brew install pgbouncer
+```
+
+**CentOS/RHEL:**
+```bash
+sudo yum install pgbouncer
+```
+
+#### Configure PgBouncer
+
+1. Edit PgBouncer configuration (usually at `/etc/pgbouncer/pgbouncer.ini`):
+
+```ini
+[databases]
+moodle_db = host=localhost port=5432 dbname=moodle_db
+
+[pgbouncer]
+listen_addr = 127.0.0.1
+listen_port = 6432
+auth_type = md5
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 100
+default_pool_size = 20
+```
+
+2. Create userlist file (`/etc/pgbouncer/userlist.txt`):
+
+```
+"username" "md5<md5_of_password>"
+```
+
+Generate MD5 password:
+```bash
+echo -n "passwordusername" | md5sum
+```
+
+3. Start PgBouncer:
+
+```bash
+sudo systemctl start pgbouncer
+sudo systemctl enable pgbouncer
+```
+
+#### Verify PgBouncer Connection
+
+```bash
+psql -h localhost -p 6432 -U username -d moodle_db
+```
 
 ---
 
@@ -78,6 +143,16 @@ PostgreSQL connection strings. Replace:
 - `password` - your PostgreSQL password
 - `localhost:5432` - your database host and port
 - `moodle_db` - your database name
+
+**Note:** If using PgBouncer (recommended for production):
+- `DATABASE_URL` - points to PgBouncer (pooled connection)
+- `DIRECT_DATABASE_URL` - points directly to PostgreSQL (for migrations and operations requiring direct connections)
+
+Example with PgBouncer:
+```env
+DATABASE_URL=postgresql://username:password@localhost:6432/moodle_db
+DIRECT_DATABASE_URL=postgresql://username:password@localhost:5432/moodle_db
+```
 
 #### NEXTAUTH_SECRET
 Generate a random secret key:
@@ -203,6 +278,18 @@ For embedding this application directly within Moodle courses, see the [LTI Setu
 - Run `npm install` again to ensure all dependencies are installed
 - Check Node.js version is 18 or higher: `node --version`
 - Clear cache: `rm -rf .next node_modules && npm install`
+
+### PgBouncer connection issues
+- Verify PgBouncer is running: `sudo systemctl status pgbouncer`
+- Check PgBouncer logs: `sudo tail -f /var/log/pgbouncer/pgbouncer.log`
+- Ensure `DATABASE_URL` points to PgBouncer port (default: 6432)
+- Ensure `DIRECT_DATABASE_URL` points to PostgreSQL port (default: 5432)
+- Test connection: `psql -h localhost -p 6432 -U username -d moodle_db`
+
+### Database migration fails with PgBouncer
+- Use `DIRECT_DATABASE_URL` for migrations
+- Some operations require direct PostgreSQL connections
+- Ensure `pool_mode = transaction` in pgbouncer.ini for compatibility
 
 ---
 
