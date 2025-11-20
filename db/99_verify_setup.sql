@@ -2,7 +2,7 @@
 -- DATABASE SETUP AND EXECUTION ORDER GUIDE
 -- ============================================================================
 -- Purpose: Master setup file with instructions for database initialization
--- Date: 2024-11-20
+-- Date: 2025-11-20
 -- Description: Execute SQL files in the correct order for optimal setup
 -- ============================================================================
 

@@ -1,5 +1,5 @@
 -- Migration: Add selected courses field to cohort role assignments
--- Date: 2024-11-18
+-- Date: 2025-11-18
 -- Description: Adds a 'selectedcourses' column to store course selections for each cohort assignment
 
 -- Add the selectedcourses column to mdl_cohort_role_assignments table

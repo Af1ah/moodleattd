@@ -147,7 +147,7 @@ function ReportContent() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gray-100">
       <Navigation title={reportName || 'Attendance Report'} showBackButton={true} />
 
       {/* Main Content */}

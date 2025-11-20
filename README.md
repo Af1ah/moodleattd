@@ -1,204 +1,219 @@
-# Moodle Attendance Report Generator
+# Moodle Attendance Reports
 
-A Next.js application that generates structured attendance reports from Moodle courses using the Moodle Web Services API.
+A modern web application for viewing and managing student attendance reports from Moodle. This system provides teachers and administrators with an intuitive interface to track attendance across courses and cohorts, with support for both direct Moodle integration and LTI (Learning Tools Interoperability) launch.
 
-## Features
+**Created by:** Muhammed Aflah  
+**GitHub:** [@Af1ah](https://github.com/Af1ah)
 
-- 🔐 **Secure Token Storage**: Store your Moodle web service token locally in browser
-- 📊 **Report Selection**: Browse and select from available attendance reports
-- 📋 **Structured Display**: View attendance in a clear table format:
-  - Student Name
-  - Course Name
-  - Session dates with status (P/A/L/E)
-  - Total Present, Absent, Late, Excused counts
-- 💾 **CSV Export**: Download reports as CSV files for further analysis
-- 🎨 **Dark Mode Support**: Responsive design with dark mode
-- ⚡ **Real-time Loading**: Loading states and error handling
+---
 
 ## Prerequisites
 
-- Node.js 18+ installed
-- A Moodle instance with Web Services enabled
-- A Moodle Web Service Token with appropriate permissions
+Before installation, ensure you have:
 
-## Getting Started
+- **Node.js** version 18 or higher
+- **PostgreSQL** database (for storing user sessions and cached data)
+- **Moodle** instance with Web Services enabled
+- Administrator access to your Moodle site
 
-### 1. Install Dependencies
+---
+
+## Installation
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Af1ah/moodleattd.git
+cd moodleattd
+```
+
+### 2. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure Environment Variables
+### 3. Setup Database
 
-Create a `.env.local` file in the project root:
-
-```bash
-cp .env.example .env.local
-```
-
-Edit `.env.local` and configure your database connections:
-
-```env
-NEXT_PUBLIC_MOODLE_TOKEN=your_actual_token_here
-
-# PgBouncer connection (recommended for production)
-DATABASE_URL=postgresql://user:password@localhost:5432/moodle_db?pgbouncer=true&connect_timeout=15
-
-# Direct connection (required for migrations)
-DIRECT_DATABASE_URL=postgresql://user:password@localhost:5432/moodle_db
-```
-
-**Note:** This project is PgBouncer-ready for optimal connection pooling. See [`db/PGBOUNCER_GUIDE.md`](db/PGBOUNCER_GUIDE.md) for details.
-
-### 3. Set Up Database Optimization (Recommended)
-
-For optimal performance, run the database optimization scripts:
+Run the database setup script:
 
 ```bash
 cd db
-chmod +x setup_database.sh
-./setup_database.sh
+bash setup_database.sh
 ```
 
-This will:
-- ✅ Create comprehensive indexes for faster queries
-- ✅ Set up materialized views for instant reports
-- ✅ Configure the custom cohort assignments table
-- ✅ Optimize user, cohort, and attendance queries
+This will create necessary tables and indexes for the application.
 
-**Performance improvements:**
-- 70-95% faster attendance queries
-- 90-98% faster report generation
-- Near-instant dashboard loads
+---
 
-📖 See [`db/README.md`](db/README.md) for detailed documentation.
+## Environment Variables
 
-### 4. Run Development Server
+Create a `.env.local` file in the project root with the following variables:
+
+```env
+# Moodle Configuration
+NEXT_PUBLIC_MOODLE_BASE_URL=https://your-moodle-site.com
+
+# Database Connections
+DATABASE_URL=postgresql://username:password@localhost:5432/moodle_db
+DIRECT_DATABASE_URL=postgresql://username:password@localhost:5432/moodle_db
+
+# Session Security
+NEXTAUTH_SECRET=generate_a_random_secret_key_here
+NEXTAUTH_URL=http://localhost:3000
+
+# LTI Configuration (see LTI_GUIDE.md for details)
+LTI_CONSUMER_KEY=your_consumer_key
+LTI_SHARED_SECRET=your_shared_secret
+```
+
+### How to Get Each Variable:
+
+#### NEXT_PUBLIC_MOODLE_BASE_URL
+Your Moodle website URL (e.g., `https://moodle.yourschool.com`)
+
+#### DATABASE_URL & DIRECT_DATABASE_URL
+PostgreSQL connection strings. Replace:
+- `username` - your PostgreSQL username
+- `password` - your PostgreSQL password
+- `localhost:5432` - your database host and port
+- `moodle_db` - your database name
+
+#### NEXTAUTH_SECRET
+Generate a random secret key:
+```bash
+openssl rand -base64 32
+```
+
+#### NEXTAUTH_URL
+- Development: `http://localhost:3000`
+- Production: Your actual domain (e.g., `https://attendance.yourschool.com`)
+
+#### LTI Keys (Optional - only if using LTI)
+See [LTI Setup Guide](./LTI_GUIDE.md) for detailed instructions.
+
+---
+
+## Moodle Configuration
+
+### Enable Web Services
+
+1. Login to Moodle as administrator
+2. Go to **Site administration** → **Server** → **Web services** → **Overview**
+3. Follow each step:
+   - Enable web services
+   - Enable protocols (REST protocol)
+   - Create a specific user (optional but recommended)
+   - Check user capability
+   - Select a service (or create custom service)
+   - Add functions to the service
+   - Select a specific user
+   - Create token for a user
+
+### Create API Token
+
+1. Go to **Site administration** → **Server** → **Web services** → **Manage tokens**
+2. Click **Create token**
+3. Select:
+   - **User**: Select the user who will access reports
+   - **Service**: Choose your web service
+4. Click **Save changes**
+5. Copy the generated token (you won't see it again)
+
+Users will enter this token when they first login to the application.
+
+---
+
+## Running the Application
+
+### Development Mode
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+The application will be available at `http://localhost:3000`
 
-### 3. Configure Moodle Token
-
-Get your Moodle Web Service Token:
-
-1. Log into your Moodle site as administrator
-2. Go to: **Site Administration → Plugins → Web Services → Manage tokens**
-3. Create a new token or copy an existing one
-4. Add it to `.env.local` file (see step 2 above)
-
-### 4. Generate Reports
-
-1. Select a report from the dropdown
-2. View the structured attendance table
-3. Click "Download CSV" to export the data
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── page.tsx              # Main application page
-│   ├── layout.tsx            # Root layout
-│   └── globals.css           # Global styles
-├── components/
-│   ├── AttendanceTable.tsx   # Attendance table component
-│   ├── ReportSelector.tsx    # Report selection dropdown
-│   └── TokenInput.tsx        # Token input component
-├── services/
-│   └── moodleAPI.ts          # Moodle API service
-├── types/
-│   └── moodle.ts             # TypeScript type definitions
-└── utils/
-    └── attendanceTransform.ts # Data transformation utilities
-```
-
-## API Endpoints Used
-
-### Base URL
-```
-https://moodle.aflahdev.me/webservice/rest/server.php
-```
-
-### Endpoints
-
-1. **List Reports**
-   - Function: `core_reportbuilder_list_reports`
-   - Returns: Available attendance reports
-
-2. **Retrieve Report**
-   - Function: `core_reportbuilder_retrieve_report`
-   - Parameters: `reportid`, `page`
-   - Returns: Report data with headers and rows
-
-## Attendance Status Codes
-
-- **P**: Present (Green)
-- **A**: Absent (Red)
-- **L**: Late (Yellow)
-- **E**: Excused (Blue)
-- **-**: Not Available (Gray)
-
-## Technologies Used
-
-- **Next.js 15**: React framework
-- **TypeScript**: Type safety
-- **Tailwind CSS**: Styling
-- **Moodle Web Services API**: Data source
-
-## Building for Production
+### Build for Production
 
 ```bash
 npm run build
-npm start
 ```
 
-## Environment Variables
+### Start Production Server
 
-Configure these in your `.env.local` file:
-
-```env
-# Required: Your Moodle Web Service Token
-NEXT_PUBLIC_MOODLE_TOKEN=your_token_here
-
-# Optional: Custom Moodle base URL (defaults to https://moodle.aflahdev.me/webservice/rest/server.php)
-# NEXT_PUBLIC_MOODLE_BASE_URL=https://your-moodle-site.com/webservice/rest/server.php
+```bash
+npm run start
 ```
 
-**Important:** Never commit `.env.local` to version control!
+---
 
-## Security Notes
+## Using the Application
 
-- Tokens are stored in `.env.local` (not committed to git)
-- Add `.env.local` to `.gitignore` (already configured)
-- Never commit your token to version control
-- Use HTTPS in production
-- Validate token permissions in Moodle
-- For non-developers: Admin configures `.env.local` once
+### First Time Login
+
+1. Open the application in your browser
+2. Enter your **Moodle username** and **password**
+3. The system will authenticate you with Moodle
+
+### Viewing Attendance
+
+**For Students:**
+- View attendance across all enrolled courses
+- Click on any course to see detailed attendance records
+
+**For Teachers/Admins:**
+- View class-based reports for assigned cohorts
+- View course-specific reports
+- Export reports to CSV format
+
+### Features
+
+- Real-time attendance data from Moodle
+- Filter and search functionality
+- Export reports to CSV
+- Responsive design for mobile and desktop
+- Automatic caching for improved performance
+
+---
+
+## LTI Integration (Optional)
+
+For embedding this application directly within Moodle courses, see the [LTI Setup Guide](./LTI_GUIDE.md).
+
+---
 
 ## Troubleshooting
 
-### Reports not loading
-- Verify your token has correct permissions
-- Check Moodle Web Services are enabled
-- Ensure the base URL is accessible
+### Cannot connect to database
+- Check your `DATABASE_URL` is correct
+- Ensure PostgreSQL is running
+- Verify database exists and user has permissions
 
-### CORS errors
-- Configure Moodle to allow your domain
-- Use a proxy if needed in development
+### Invalid Moodle credentials
+- Verify username and password are correct
+- Check that the user has web service access enabled
 
-## License
+### Token not working
+- Ensure Web Services are enabled in Moodle
+- Check that the token hasn't expired
+- Verify the user has necessary capabilities
 
-MIT
+### Build fails
+- Run `npm install` again to ensure all dependencies are installed
+- Check Node.js version is 18 or higher: `node --version`
+- Clear cache: `rm -rf .next node_modules && npm install`
+
+---
 
 ## Support
 
-For issues or questions, please check:
-- Moodle Web Services documentation
-- Next.js documentation
-- Project issues on GitHub
+For issues or questions:
+- Check existing issues on GitHub
+- Create a new issue with detailed description
+- Contact: GitHub [@Af1ah](https://github.com/Af1ah)
 
+---
+
+**Version:** 1.0.0  
+**Last Updated:** November 2025

@@ -2,7 +2,7 @@
 -- USER, COHORT, AND ROLE TABLES INDEXING OPTIMIZATION
 -- ============================================================================
 -- Purpose: Improve query performance for user, cohort, and role-related tables
--- Date: 2024-11-20
+-- Date: 2025-11-20
 -- Description: Creates additional indexes for frequently queried columns
 -- ============================================================================
 
