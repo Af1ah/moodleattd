@@ -2,12 +2,24 @@
 
 import { useEffect, useState } from 'react';
 
-export type DateRangeOption = 'week' | 'month' | 'custom';
+export type DateRangeOption = 'week' | 'month' | 'semester' | 'custom';
 
 export interface DateRange {
   option: DateRangeOption;
   startDate: string;
   endDate: string;
+  semesterName?: string;
+}
+
+interface SemesterInfo {
+  id: string;
+  admissionyear: string;
+  semestername: string;
+  startdate: string;
+  enddate: string;
+  startTimestamp: number;
+  endTimestamp: number;
+  iscurrent: boolean;
 }
 
 interface FilterModalProps {
@@ -42,16 +54,78 @@ export default function FilterModal({
   onToggleHideNonTaken,
 }: FilterModalProps) {
   const [localDateRange, setLocalDateRange] = useState<DateRange>(dateRange);
+  const [semesters, setSemesters] = useState<SemesterInfo[]>([]);
+  const [currentSemester, setCurrentSemester] = useState<SemesterInfo | null>(null);
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string>('current');
+  const [loadingSemesters, setLoadingSemesters] = useState(true);
 
   // Sync local state with prop changes
   useEffect(() => {
     setLocalDateRange(dateRange);
   }, [dateRange]);
 
+  // Fetch semester data on mount
+  useEffect(() => {
+    fetchSemesterData();
+  }, []);
+
+  const fetchSemesterData = async () => {
+    try {
+      setLoadingSemesters(true);
+      const token = localStorage.getItem('moodleToken');
+      const userId = localStorage.getItem('moodleUserId');
+      const headers: HeadersInit = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const url = userId ? `/api/userAdmissionYear?userId=${userId}` : '/api/userAdmissionYear';
+      const response = await fetch(url, { headers });
+      
+      if (!response.ok) {
+        console.log('No semester data available');
+        setLoadingSemesters(false);
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.admissionYear) {
+        setSemesters(data.allSemesters || []);
+        
+        if (data.currentSemester) {
+          setCurrentSemester(data.currentSemester);
+          
+          // ALWAYS auto-apply current semester as default
+          const startDate = new Date(data.currentSemester.startdate).toISOString().split('T')[0];
+          const endDate = new Date(data.currentSemester.enddate).toISOString().split('T')[0];
+          const newRange = {
+            option: 'semester' as const,
+            startDate,
+            endDate,
+            semesterName: data.currentSemester.semestername,
+          };
+          setLocalDateRange(newRange);
+          
+          // Apply immediately to parent component
+          if (!dateRange.startDate) {
+            onDateRangeChange(newRange);
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Error fetching semester data:', error);
+    } finally {
+      setLoadingSemesters(false);
+    }
+  };
+
   const handleDateRangeOptionChange = (option: DateRangeOption) => {
     const today = new Date();
     let startDate = '';
     let endDate = '';
+    let semesterName: string | undefined;
 
     if (option === 'week') {
       // Get current week (Monday to Sunday)
@@ -70,14 +144,44 @@ export default function FilterModal({
       
       startDate = firstDay.toISOString().split('T')[0];
       endDate = lastDay.toISOString().split('T')[0];
+    } else if (option === 'semester') {
+      // Use current semester or selected semester
+      const semester = selectedSemesterId === 'current' ? currentSemester : semesters.find(s => s.id === selectedSemesterId);
+      if (semester) {
+        startDate = new Date(semester.startdate).toISOString().split('T')[0];
+        endDate = new Date(semester.enddate).toISOString().split('T')[0];
+        semesterName = semester.semestername;
+      } else {
+        // Fallback to current month if no semester available
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+        startDate = firstDay.toISOString().split('T')[0];
+        endDate = lastDay.toISOString().split('T')[0];
+      }
     } else {
       // Custom - keep existing or use current week as default
       startDate = localDateRange.startDate || new Date().toISOString().split('T')[0];
       endDate = localDateRange.endDate || new Date().toISOString().split('T')[0];
     }
 
-    const newRange: DateRange = { option, startDate, endDate };
+    const newRange: DateRange = { option, startDate, endDate, semesterName };
     setLocalDateRange(newRange);
+  };
+
+  const handleSemesterChange = (semesterId: string) => {
+    setSelectedSemesterId(semesterId);
+    const semester = semesterId === 'current' ? currentSemester : semesters.find(s => s.id === semesterId);
+    
+    if (semester) {
+      const startDate = new Date(semester.startdate).toISOString().split('T')[0];
+      const endDate = new Date(semester.enddate).toISOString().split('T')[0];
+      setLocalDateRange({
+        option: 'semester',
+        startDate,
+        endDate,
+        semesterName: semester.semestername,
+      });
+    }
   };
 
   const handleCustomDateChange = (field: 'startDate' | 'endDate', value: string) => {
@@ -187,6 +291,18 @@ export default function FilterModal({
               
               {/* Date Range Options - Compact Pills */}
               <div className="flex gap-2 mb-3 flex-wrap">
+                {!loadingSemesters && (currentSemester || semesters.length > 0) && (
+                  <button
+                    onClick={() => handleDateRangeOptionChange('semester')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      localDateRange.option === 'semester'
+                        ? 'bg-white text-gray-900 shadow-md ring-2 ring-blue-500'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                     Semester
+                  </button>
+                )}
                 <button
                   onClick={() => handleDateRangeOptionChange('week')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -219,6 +335,8 @@ export default function FilterModal({
                 </button>
               </div>
               
+              
+              
               {/* Custom Date Inputs */}
               {localDateRange.option === 'custom' && (
                 <div className="grid grid-cols-2 gap-2 mb-3">
@@ -246,9 +364,16 @@ export default function FilterModal({
               {/* Current Selection Display */}
               {localDateRange.startDate && localDateRange.endDate && (
                 <div className="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded-lg">
-                  {new Date(localDateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  {' - '}
-                  {new Date(localDateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {localDateRange.semesterName && (
+                    <div className="font-medium text-gray-800 mb-1">
+                      {localDateRange.semesterName}
+                    </div>
+                  )}
+                  <div>
+                    {new Date(localDateRange.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {' - '}
+                    {new Date(localDateRange.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
                 </div>
               )}
             </div>

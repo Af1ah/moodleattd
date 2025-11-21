@@ -1377,6 +1377,10 @@
  public     | mdl_search_simpledb_index        | mdl_searsimpinde_doc_uix               | CREATE UNIQUE INDEX mdl_searsimpinde_doc_uix ON public.mdl_search_simpledb_index USING btree (docid)
  public     | mdl_search_simpledb_index        | mdl_searsimpinde_id_pk                 | CREATE UNIQUE INDEX mdl_searsimpinde_id_pk ON public.mdl_search_simpledb_index USING btree (id)
  public     | mdl_search_simpledb_index        | mdl_searsimpinde_owncon_ix             | CREATE INDEX mdl_searsimpinde_owncon_ix ON public.mdl_search_simpledb_index USING btree (owneruserid, contextid)
+ public     | mdl_semester_dates               | mdl_semdate_adm_ix                     | CREATE INDEX mdl_semdate_adm_ix ON public.mdl_semester_dates USING btree (admissionyear)
+ public     | mdl_semester_dates               | mdl_semdate_admsem_uix                 | CREATE UNIQUE INDEX mdl_semdate_admsem_uix ON public.mdl_semester_dates USING btree (admissionyear, semestername)
+ public     | mdl_semester_dates               | mdl_semdate_cur_ix                     | CREATE INDEX mdl_semdate_cur_ix ON public.mdl_semester_dates USING btree (iscurrent)
+ public     | mdl_semester_dates               | mdl_semester_dates_pkey                | CREATE UNIQUE INDEX mdl_semester_dates_pkey ON public.mdl_semester_dates USING btree (id)
  public     | mdl_sessions                     | mdl_sess_id_pk                         | CREATE UNIQUE INDEX mdl_sess_id_pk ON public.mdl_sessions USING btree (id)
  public     | mdl_sessions                     | mdl_sess_sid_uix                       | CREATE UNIQUE INDEX mdl_sess_sid_uix ON public.mdl_sessions USING btree (sid)
  public     | mdl_sessions                     | mdl_sess_sta_ix                        | CREATE INDEX mdl_sess_sta_ix ON public.mdl_sessions USING btree (state)
@@ -1675,7 +1679,7 @@
  public     | mdl_xapi_states                  | mdl_xapistat_id_pk                     | CREATE UNIQUE INDEX mdl_xapistat_id_pk ON public.mdl_xapi_states USING btree (id)
  public     | mdl_xapi_states                  | mdl_xapistat_tim_ix                    | CREATE INDEX mdl_xapistat_tim_ix ON public.mdl_xapi_states USING btree (timemodified)
  public     | mdl_xapi_states                  | mdl_xapistat_use_ix                    | CREATE INDEX mdl_xapistat_use_ix ON public.mdl_xapi_states USING btree (userid)
-(1675 rows)
+(1679 rows)
 
  schemaname |          tablename          | total_size | table_size | indexes_size 
 ------------+-----------------------------+------------+------------+--------------
@@ -1748,16 +1752,16 @@ LINE 3:     tablename,
 
        metric        | value 
 ---------------------+-------
- Total database size | 45 MB
+ Total database size | 46 MB
  Total tables size   | 24 MB
  Total indexes size  | 18 MB
- Number of tables    | 498
- Number of indexes   | 1682
+ Number of tables    | 499
+ Number of indexes   | 1686
 (5 rows)
 
                                                              QUERY PLAN                                                             
 ------------------------------------------------------------------------------------------------------------------------------------
- Seq Scan on mdl_attendance_log  (cost=0.03..8.08 rows=12 width=61) (actual time=0.011..0.026 rows=9.00 loops=1)
+ Seq Scan on mdl_attendance_log  (cost=0.03..8.08 rows=12 width=61) (actual time=0.012..0.026 rows=9.00 loops=1)
    Filter: (sessionid = (InitPlan 1).col1)
    Rows Removed by Filter: 315
    Buffers: shared hit=6
@@ -1768,66 +1772,66 @@ LINE 3:     tablename,
                  Buffers: shared hit=2
  Planning:
    Buffers: shared hit=9
- Planning Time: 0.140 ms
- Execution Time: 0.043 ms
+ Planning Time: 0.170 ms
+ Execution Time: 0.040 ms
 (13 rows)
 
                                                                  QUERY PLAN                                                                 
 --------------------------------------------------------------------------------------------------------------------------------------------
- Sort  (cost=23.33..23.36 rows=11 width=138) (actual time=0.043..0.045 rows=0.00 loops=1)
+ Sort  (cost=23.33..23.36 rows=11 width=138) (actual time=0.046..0.048 rows=0.00 loops=1)
    Sort Key: s.sessdate DESC
    Sort Method: quicksort  Memory: 25kB
    Buffers: shared hit=7
    InitPlan 1
-     ->  Limit  (cost=0.00..0.06 rows=1 width=8) (actual time=0.005..0.005 rows=1.00 loops=1)
+     ->  Limit  (cost=0.00..0.06 rows=1 width=8) (actual time=0.004..0.004 rows=1.00 loops=1)
            Buffers: shared hit=2
-           ->  Seq Scan on mdl_user  (cost=0.00..10.07 rows=166 width=8) (actual time=0.004..0.004 rows=1.00 loops=1)
+           ->  Seq Scan on mdl_user  (cost=0.00..10.07 rows=166 width=8) (actual time=0.003..0.003 rows=1.00 loops=1)
                  Filter: (deleted = 0)
                  Buffers: shared hit=2
-   ->  Hash Join  (cost=14.97..23.08 rows=11 width=138) (actual time=0.039..0.040 rows=0.00 loops=1)
+   ->  Hash Join  (cost=14.97..23.08 rows=11 width=138) (actual time=0.041..0.042 rows=0.00 loops=1)
          Hash Cond: (al.statusid = st.id)
          Buffers: shared hit=7
-         ->  Hash Join  (cost=13.43..21.51 rows=11 width=136) (actual time=0.024..0.024 rows=0.00 loops=1)
+         ->  Hash Join  (cost=13.43..21.51 rows=11 width=136) (actual time=0.023..0.024 rows=0.00 loops=1)
                Hash Cond: (al.sessionid = s.id)
                Buffers: shared hit=6
-               ->  Seq Scan on mdl_attendance_log al  (cost=0.00..8.05 rows=11 width=16) (actual time=0.024..0.024 rows=0.00 loops=1)
+               ->  Seq Scan on mdl_attendance_log al  (cost=0.00..8.05 rows=11 width=16) (actual time=0.023..0.023 rows=0.00 loops=1)
                      Filter: (studentid = (InitPlan 1).col1)
                      Rows Removed by Filter: 324
                      Buffers: shared hit=6
                ->  Hash  (cost=10.42..10.42 rows=241 width=128) (never executed)
                      ->  Seq Scan on mdl_attendance_sessions s  (cost=0.00..10.42 rows=241 width=128) (never executed)
                            Filter: (sessdate > (EXTRACT(epoch FROM (now() - '30 days'::interval)))::bigint)
-         ->  Hash  (cost=1.24..1.24 rows=24 width=10) (actual time=0.014..0.014 rows=24.00 loops=1)
+         ->  Hash  (cost=1.24..1.24 rows=24 width=10) (actual time=0.015..0.016 rows=24.00 loops=1)
                Buckets: 1024  Batches: 1  Memory Usage: 10kB
                Buffers: shared hit=1
                ->  Seq Scan on mdl_attendance_statuses st  (cost=0.00..1.24 rows=24 width=10) (actual time=0.006..0.008 rows=24.00 loops=1)
                      Buffers: shared hit=1
  Planning:
-   Buffers: shared hit=109 read=1
- Planning Time: 0.901 ms
- Execution Time: 0.081 ms
+   Buffers: shared hit=93 read=2
+ Planning Time: 0.826 ms
+ Execution Time: 0.084 ms
 (32 rows)
 
                                                             QUERY PLAN                                                             
 -----------------------------------------------------------------------------------------------------------------------------------
- HashAggregate  (cost=6.26..6.37 rows=11 width=26) (actual time=0.083..0.086 rows=11.00 loops=1)
+ HashAggregate  (cost=6.26..6.37 rows=11 width=26) (actual time=0.084..0.086 rows=11.00 loops=1)
    Group Key: c.id
    Batches: 1  Memory Usage: 32kB
    Buffers: shared hit=3
-   ->  Hash Right Join  (cost=1.27..5.46 rows=160 width=26) (actual time=0.018..0.056 rows=160.00 loops=1)
+   ->  Hash Right Join  (cost=1.27..5.46 rows=160 width=26) (actual time=0.017..0.055 rows=160.00 loops=1)
          Hash Cond: (cm.cohortid = c.id)
          Buffers: shared hit=3
-         ->  Seq Scan on mdl_cohort_members cm  (cost=0.00..3.60 rows=160 width=16) (actual time=0.003..0.012 rows=160.00 loops=1)
+         ->  Seq Scan on mdl_cohort_members cm  (cost=0.00..3.60 rows=160 width=16) (actual time=0.004..0.012 rows=160.00 loops=1)
                Buffers: shared hit=2
-         ->  Hash  (cost=1.14..1.14 rows=11 width=18) (actual time=0.011..0.012 rows=11.00 loops=1)
+         ->  Hash  (cost=1.14..1.14 rows=11 width=18) (actual time=0.010..0.010 rows=11.00 loops=1)
                Buckets: 1024  Batches: 1  Memory Usage: 9kB
                Buffers: shared hit=1
-               ->  Seq Scan on mdl_cohort c  (cost=0.00..1.14 rows=11 width=18) (actual time=0.006..0.008 rows=11.00 loops=1)
+               ->  Seq Scan on mdl_cohort c  (cost=0.00..1.14 rows=11 width=18) (actual time=0.005..0.007 rows=11.00 loops=1)
                      Filter: (visible = 1)
                      Buffers: shared hit=1
  Planning:
-   Buffers: shared hit=13
- Planning Time: 0.216 ms
- Execution Time: 0.113 ms
+   Buffers: shared hit=7
+ Planning Time: 0.203 ms
+ Execution Time: 0.111 ms
 (19 rows)
 

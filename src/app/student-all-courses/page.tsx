@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { ProtectedRoute, useAuth } from '@/components/AuthProvider';
 import AttendanceTable from '@/components/AttendanceTable';
 import Navigation from '@/components/Navigation';
+import SemesterDatePicker from '@/components/SemesterDatePicker';
 import { AttendanceTableData } from '@/types/moodle';
 import { BarChart3 } from 'lucide-react';
 
@@ -142,6 +143,7 @@ function StudentAllCoursesPage() {
   const [error, setError] = useState<string | null>(null);
   const [studentName] = useState<string>('Student');
   const [courseSummaries, setCourseSummaries] = useState<CourseSummary[]>([]);
+  const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string; semesterName?: string } | null>(null);
 
   const fetchEnrolledCourses = useCallback(async (studentId: number) => {
     try {
@@ -190,14 +192,30 @@ function StudentAllCoursesPage() {
       }
 
       // Fetching attendance for multiple courses
+      // Include date range if set
+      const requestBody: any = {
+        studentId,
+        courseIds,
+      };
+
+      if (dateRange) {
+        // Convert date strings to Unix timestamps
+        const startTimestamp = Math.floor(new Date(dateRange.startDate).getTime() / 1000);
+        const endTimestamp = Math.floor(new Date(dateRange.endDate + 'T23:59:59').getTime() / 1000);
+        requestBody.datefrom = startTimestamp;
+        requestBody.dateto = endTimestamp;
+        console.log('📅 Using date range:', dateRange.semesterName || 'Custom', {
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          startTimestamp,
+          endTimestamp
+        });
+      }
 
       const response = await fetch('/api/getStudentAllCoursesAttendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studentId,
-          courseIds,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -247,7 +265,12 @@ function StudentAllCoursesPage() {
     if (userId) {
       fetchAttendanceData();
     }
-  }, [fetchAttendanceData, userId]);
+  }, [fetchAttendanceData, userId, dateRange]);
+
+  const handleDateRangeChange = (startDate: string, endDate: string, semesterName?: string) => {
+    console.log('📅 Date range changed:', { startDate, endDate, semesterName });
+    setDateRange({ startDate, endDate, semesterName });
+  };
 
   if (loading) {
     return (

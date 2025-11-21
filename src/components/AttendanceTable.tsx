@@ -103,6 +103,43 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
     }
   }, [allCourses]);
 
+  // Fetch current semester on mount and set as initial date range
+  useEffect(() => {
+    const fetchInitialSemester = async () => {
+      try {
+        const token = localStorage.getItem('moodleToken');
+        const userId = localStorage.getItem('moodleUserId');
+        const headers: HeadersInit = {};
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const url = userId ? `/api/userAdmissionYear?userId=${userId}` : '/api/userAdmissionYear';
+        const response = await fetch(url, { headers });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.currentSemester) {
+            const startDate = new Date(data.currentSemester.startdate).toISOString().split('T')[0];
+            const endDate = new Date(data.currentSemester.enddate).toISOString().split('T')[0];
+            setDateRange({
+              option: 'semester',
+              startDate,
+              endDate,
+              semesterName: data.currentSemester.semestername,
+            });
+          }
+        }
+      } catch (error) {
+        console.log('Could not fetch semester data, using month default:', error);
+      }
+    };
+
+    fetchInitialSemester();
+  }, []); // Run once on mount
+
   // Close download menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -608,7 +645,7 @@ export default function AttendanceTable({ data, baseUrl, reportHeaders = [], onS
 
       {/* Table */}
       {visibleSessionDates.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div className="overflow-x-auto rounded-lg border  shadow-[0_4px_20px_rgba(0,0,0,0.05)] border-gray-200">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               {/* Date Row */}

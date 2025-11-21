@@ -284,3 +284,22 @@ model mdl_cohort_role_assignments {
   @@index([userid], name: "mdl_cohoroleass_use_ix")
   @@index([roleid], name: "mdl_cohoroleass_rol_ix")
 }
+
+// Custom table: Semester dates by admission year
+// Stores semester date ranges for each admission year to auto-populate date filters
+model mdl_semester_dates {
+  id                BigInt   @id @default(autoincrement())
+  admissionyear     String   @db.VarChar(4)  // e.g., "2024"
+  semestername      String   @db.VarChar(50) // e.g., "Semester 1", "Fall 2024"
+  startdate         DateTime @db.Date
+  enddate           DateTime @db.Date
+  iscurrent         Boolean  @default(false) // Mark the active semester
+  timecreated       BigInt
+  timemodified      BigInt
+  createdby         BigInt
+  
+  @@map("mdl_semester_dates")
+  @@unique([admissionyear, semestername], name: "mdl_semdate_admsem_uix")
+  @@index([admissionyear], name: "mdl_semdate_adm_ix")
+  @@index([iscurrent], name: "mdl_semdate_cur_ix")
+}

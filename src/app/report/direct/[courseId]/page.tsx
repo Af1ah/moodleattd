@@ -343,7 +343,7 @@ function DirectAttendanceReport() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-green-50 via-white to-green-50">
+      <div className="min-h-screen bg-gray-100">
         <Navigation 
           title={courseName || 'Loading...'} 
           showBackButton={true} 
@@ -379,7 +379,7 @@ function DirectAttendanceReport() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-green-50 via-white to-green-50">
+    <div className="min-h-screen bg-gray-100">
       <Navigation 
         title={courseName ? `${courseName} ` : `Course ${courseId}`} 
         showBackButton={true} 

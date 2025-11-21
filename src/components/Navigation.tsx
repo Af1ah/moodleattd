@@ -202,16 +202,26 @@ export default function Navigation({ title, showBackButton = false, icon }: Navi
             <div className="flex items-center gap-2">
               {/* Desktop: User info + Logout button */}
               <div className="hidden sm:flex items-center gap-2">
-                {/* Manager Cohort Assignment Button */}
+                {/* Manager Admin Buttons */}
                 {role?.roleShortname === 'manager' && (
-                  <button
-                    onClick={() => router.push('/admin/cohort-assignments')}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 text-blue-600 border border-blue-200 hover:bg-blue-500/20 rounded-lg transition-colors active:scale-95"
-                    title="Manage Cohort Assignments"
-                  >
-                    <Users className="w-4 h-4" />
-                    <span className="text-sm font-medium hidden lg:inline">Cohort Roles</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => router.push('/admin/cohort-assignments')}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 text-blue-600 border border-blue-200 hover:bg-blue-500/20 rounded-lg transition-colors active:scale-95"
+                      title="Manage Cohort Assignments"
+                    >
+                      <Users className="w-4 h-4" />
+                      <span className="text-sm font-medium hidden lg:inline">Cohort Roles</span>
+                    </button>
+                    <button
+                      onClick={() => router.push('/admin/semester-dates')}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-600 border border-green-200 hover:bg-green-500/20 rounded-lg transition-colors active:scale-95"
+                      title="Manage Semester Dates"
+                    >
+                      <BarChart3 className="w-4 h-4" />
+                      <span className="text-sm font-medium hidden lg:inline">Semesters</span>
+                    </button>
+                  </>
                 )}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-lg" title={`Role: ${userRole}`}>
                   <User className="w-4 h-4 text-blue-600" />
@@ -280,19 +290,32 @@ export default function Navigation({ title, showBackButton = false, icon }: Navi
                 </div>
               </div>
 
-              {/* Manager Cohort Assignment Button */}
+              {/* Manager Admin Buttons */}
               {role?.roleShortname === 'manager' && (
-                <button
-                  onClick={() => {
-                    setIsDrawerOpen(false);
-                    router.push('/admin/cohort-assignments');
-                  }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 mb-2 text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition-colors active:scale-95 font-medium"
-                  aria-label="Manage Cohort Assignments"
-                >
-                  <Users className="w-4 h-4" />
-                  <span>Manage Cohort Roles</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      setIsDrawerOpen(false);
+                      router.push('/admin/cohort-assignments');
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 mb-2 text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition-colors active:scale-95 font-medium"
+                    aria-label="Manage Cohort Assignments"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>Manage Cohort Roles</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsDrawerOpen(false);
+                      router.push('/admin/semester-dates');
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 mb-2 text-green-600 bg-green-50 border border-green-200 hover:bg-green-100 rounded-xl transition-colors active:scale-95 font-medium"
+                    aria-label="Manage Semester Dates"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    <span>Manage Semesters</span>
+                  </button>
+                </>
               )}
 
               {/* Logout Button */}
