@@ -172,13 +172,13 @@ export default function SemesterDatePicker({
           >
             {currentSemester && (
               <option value="current">
-                Current: {currentSemester.semestername}
+                Current: Semester {currentSemester.semestername}
               </option>
             )}
             
             {semesters.filter(s => !s.iscurrent).map((semester) => (
               <option key={semester.id} value={semester.id}>
-                {semester.semestername}
+                Semester {semester.semestername}
               </option>
             ))}
             

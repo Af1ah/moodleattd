@@ -23,6 +23,91 @@ async function checkAuth(request: NextRequest) {
   return null;
 }
 
+// Helper function to adjust date to avoid weekends
+function adjustDateForWeekend(date: Date): Date {
+  const day = date.getDay();
+  if (day === 0) { // Sunday
+    date.setDate(date.getDate() + 1);
+  } else if (day === 6) { // Saturday
+    date.setDate(date.getDate() + 2);
+  }
+  return date;
+}
+
+// Helper function to auto-generate semesters for an admission year
+async function autoGenerateSemesters(admissionYear: string) {
+  const existingSemesters = await prisma.mdl_semester_dates.findMany({
+    where: { admissionyear: admissionYear },
+  });
+
+  // If all semesters exist for this year, skip generation
+  if (existingSemesters.length >= 8) {
+    return [];
+  }
+
+  // Get all used semester numbers globally (across all years)
+  const allSemesters = await prisma.mdl_semester_dates.findMany({
+    select: { semestername: true }
+  });
+  const usedSemesterNumbers = new Set(allSemesters.map(s => s.semestername));
+
+  const now = Math.floor(Date.now() / 1000);
+  const currentDate = new Date();
+  const newSemesters = [];
+
+  // Generate semesters 1-10, skipping already used numbers globally
+  for (let sem = 1; sem <= 10; sem++) {
+    const semStr = sem.toString();
+    
+    // Skip if this semester number is already used by ANY admission year
+    if (usedSemesterNumbers.has(semStr)) continue;
+    
+    // Skip if this year already has this semester
+    const existsForThisYear = existingSemesters.some((s: any) => s.semestername === semStr);
+    if (existsForThisYear) continue;
+
+    // Calculate year offset (each year has 2 semesters)
+    const yearOffset = Math.floor((sem - 1) / 2);
+    const baseYear = parseInt(admissionYear) + yearOffset;
+
+    let startDate: Date;
+    let endDate: Date;
+
+    // Odd semesters (1,3,5,7): July - November
+    if (sem % 2 === 1) {
+      startDate = new Date(baseYear, 6, 1); // July 1
+      endDate = new Date(baseYear, 10, 30); // November 30
+    } else {
+      // Even semesters (2,4,6,8): December - March
+      startDate = new Date(baseYear, 11, 1); // December 1
+      endDate = new Date(baseYear + 1, 2, 31); // March 31 next year
+    }
+
+    // Adjust dates to avoid weekends
+    startDate = adjustDateForWeekend(startDate);
+    endDate = adjustDateForWeekend(endDate);
+
+    // Check if this semester should be current based on today's date
+    const isCurrent = currentDate >= startDate && currentDate <= endDate;
+
+    newSemesters.push({
+      admissionyear: admissionYear,
+      semestername: semStr,
+      startdate: startDate,
+      enddate: endDate,
+      iscurrent: isCurrent,
+      timecreated: BigInt(now),
+      timemodified: BigInt(now),
+      createdby: BigInt(2), // Default admin user
+    });
+    
+    // Stop after generating 8 semesters for this year
+    if (newSemesters.length >= 8) break;
+  }
+
+  return newSemesters;
+}
+
 // GET: Fetch all semester dates or filter by admission year
 export async function GET(request: NextRequest) {
   try {
@@ -48,9 +133,87 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: [
         { admissionyear: "desc" },
-        { startdate: "desc" },
+        { semestername: "asc" },
       ],
     });
+
+    // Auto-increment to next semester only if current one has ended
+    const currentDate = new Date();
+    const updates = [];
+    
+    for (const semester of semesterDates) {
+      const endDate = new Date(semester.enddate);
+      
+      // If current semester's end date has passed, auto-increment
+      if (semester.iscurrent && currentDate > endDate) {
+        // Find next available semester number
+        const currentNum = parseInt(semester.semestername);
+        const allUsedNumbers = semesterDates.map(s => parseInt(s.semestername));
+        
+        let nextNum = currentNum + 1;
+        while (allUsedNumbers.includes(nextNum) && nextNum <= 10) {
+          nextNum++;
+        }
+        
+        if (nextNum <= 10) {
+          // Update to next semester number
+          const yearOffset = Math.floor((nextNum - 1) / 2);
+          const baseYear = parseInt(semester.admissionyear) + yearOffset;
+          
+          let newStartDate: Date;
+          let newEndDate: Date;
+          
+          if (nextNum % 2 === 1) {
+            // Odd semester: July - November
+            newStartDate = new Date(baseYear, 6, 1);
+            newEndDate = new Date(baseYear, 10, 30);
+          } else {
+            // Even semester: December - March
+            newStartDate = new Date(baseYear, 11, 1);
+            newEndDate = new Date(baseYear + 1, 2, 31);
+          }
+          
+          updates.push(
+            prisma.mdl_semester_dates.update({
+              where: { id: semester.id },
+              data: {
+                semestername: nextNum.toString(),
+                startdate: adjustDateForWeekend(newStartDate),
+                enddate: adjustDateForWeekend(newEndDate),
+                iscurrent: true,
+                timemodified: BigInt(Math.floor(Date.now() / 1000)),
+              },
+            })
+          );
+        }
+      }
+    }
+
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      // Refetch after updates
+      const updatedSemesters = await prisma.mdl_semester_dates.findMany({
+        where,
+        orderBy: [
+          { admissionyear: "desc" },
+          { semestername: "asc" },
+        ],
+      });
+      
+      // Serialize BigInt values for JSON
+      const serialized = updatedSemesters.map((s: any) => ({
+        id: s.id.toString(),
+        admissionyear: s.admissionyear,
+        semestername: s.semestername,
+        startdate: s.startdate.toISOString(),
+        enddate: s.enddate.toISOString(),
+        iscurrent: s.iscurrent,
+        timecreated: s.timecreated.toString(),
+        timemodified: s.timemodified.toString(),
+      }));
+      
+      return NextResponse.json(serialized);
+    }
 
     // Serialize BigInt values for JSON
     const serialized = semesterDates.map((s: any) => ({
@@ -106,6 +269,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if semester number is already used
+    const existingSemester = await prisma.mdl_semester_dates.findFirst({
+      where: { semestername }
+    });
+    
+    if (existingSemester) {
+      return NextResponse.json(
+        { error: `Semester ${semestername} is already used by admission year ${existingSemester.admissionyear}` },
+        { status: 409 }
+      );
+    }
+
     // If marking as current, unmark other semesters for this admission year
     if (iscurrent) {
       await prisma.mdl_semester_dates.updateMany({
@@ -119,8 +294,8 @@ export async function POST(request: NextRequest) {
       data: {
         admissionyear,
         semestername,
-        startdate: new Date(startdate),
-        enddate: new Date(enddate),
+        startdate: adjustDateForWeekend(new Date(startdate)),
+        enddate: adjustDateForWeekend(new Date(enddate)),
         iscurrent,
         timecreated: BigInt(now),
         timemodified: BigInt(now),
@@ -202,7 +377,24 @@ export async function PUT(request: NextRequest) {
     };
 
     if (admissionyear) updateData.admissionyear = admissionyear;
-    if (semestername) updateData.semestername = semestername;
+    if (semestername) {
+      // Validate uniqueness: No two admission years can have the same semester
+      const existingSemester = await prisma.mdl_semester_dates.findFirst({
+        where: {
+          semestername,
+          id: { not: BigInt(id) }
+        }
+      });
+      
+      if (existingSemester) {
+        return NextResponse.json(
+          { error: `Semester ${semestername} is already used by admission year ${existingSemester.admissionyear}. Each semester must be unique across all years.` },
+          { status: 409 }
+        );
+      }
+      
+      updateData.semestername = semestername;
+    }
     if (startdate) updateData.startdate = new Date(startdate);
     if (enddate) updateData.enddate = new Date(enddate);
     if (typeof iscurrent === "boolean") updateData.iscurrent = iscurrent;

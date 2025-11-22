@@ -299,7 +299,7 @@ model mdl_semester_dates {
   createdby         BigInt
   
   @@map("mdl_semester_dates")
-  @@unique([admissionyear, semestername], name: "mdl_semdate_admsem_uix")
+  @@unique([semestername], name: "mdl_semdate_sem_uix")
   @@index([admissionyear], name: "mdl_semdate_adm_ix")
   @@index([iscurrent], name: "mdl_semdate_cur_ix")
 }
