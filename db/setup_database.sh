@@ -103,6 +103,7 @@ SQL_FILES=(
     "02_create_cohort_role_assignments.sql"
     "03_migration_add_selected_courses.sql"
     "04_performance_optimization.sql"
+    "apply_performance_indexes.sql"
 )
 
 TOTAL_FILES=${#SQL_FILES[@]}
