@@ -222,21 +222,34 @@ function DirectAttendanceReport() {
         throw new Error('No authentication token found');
       }
 
-      // First get course info
-      let fetchedCourseName = '';
-      const courseResponse = await fetch('/api/moodle/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          wsfunction: 'core_course_get_enrolled_courses_by_timeline_classification',
-          classification: 'all',
-          moodlewsrestformat: 'json',
+      // Fetch course info and attendance data in parallel for better performance
+      const [courseResponse, response] = await Promise.all([
+        fetch('/api/moodle/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            wsfunction: 'core_course_get_enrolled_courses_by_timeline_classification',
+            classification: 'all',
+            moodlewsrestformat: 'json',
+          }),
         }),
-      });
+        // Get attendance sessions from database (faster) - NEW METHOD
+        fetch('/api/getAttendanceDB', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            courseId: courseId,
+          }),
+        })
+      ]);
 
+      // Process course name from parallel fetch
+      let fetchedCourseName = '';
       if (courseResponse.ok) {
         const courseData = await courseResponse.json();
         const courses = courseData.courses || [];
@@ -246,17 +259,6 @@ function DirectAttendanceReport() {
           setCourseName(course.fullname);
         }
       }
-
-      // Get attendance sessions from database (faster) - NEW METHOD
-      const response = await fetch('/api/getAttendanceDB', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          courseId: courseId,
-        }),
-      });
       
       // OLD METHOD (commented out - using Moodle API)
       // const response = await fetch('/api/getAttendanceDirect', {

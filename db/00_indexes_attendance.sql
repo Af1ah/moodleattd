@@ -77,6 +77,10 @@ ON mdl_attendance_log(sessionid, studentid);
 CREATE INDEX IF NOT EXISTS mdl_attelog_stu_sta_ix 
 ON mdl_attendance_log(studentid, statusid);
 
+-- Composite index for session + status (for efficient joins with status table)
+CREATE INDEX IF NOT EXISTS mdl_attelog_ses_sta_ix 
+ON mdl_attendance_log(sessionid, statusid);
+
 -- Index for timetaken queries
 CREATE INDEX IF NOT EXISTS mdl_attelog_timetaken_ix 
 ON mdl_attendance_log(timetaken DESC);
