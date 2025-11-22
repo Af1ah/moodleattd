@@ -220,10 +220,10 @@ export async function POST(request: NextRequest) {
     const isValid = await verifyLTISignature(formData);
     if (!isValid) {
       console.error('❌ Invalid LTI signature');
-      return NextResponse.redirect(
-        new URL('/login?error=invalid_lti_signature', request.url),
-        { status: 303 }
-      );
+      const redirectUrl = process.env.NODE_ENV === 'production'
+        ? 'https://report.aflahdev.me/login?error=invalid_lti_signature'
+        : new URL('/login?error=invalid_lti_signature', request.url).toString();
+      return NextResponse.redirect(redirectUrl, { status: 303 });
     }
 
     // Extract LTI parameters
@@ -237,10 +237,10 @@ export async function POST(request: NextRequest) {
     // Validate required parameters
     if (!userId || !contextId) {
       console.error('❌ Missing required parameters');
-      return NextResponse.redirect(
-        new URL('/login?error=missing_parameters', request.url),
-        { status: 303 }
-      );
+      const redirectUrl = process.env.NODE_ENV === 'production'
+        ? 'https://report.aflahdev.me/login?error=missing_parameters'
+        : new URL('/login?error=missing_parameters', request.url).toString();
+      return NextResponse.redirect(redirectUrl, { status: 303 });
     }
 
     try {
@@ -261,10 +261,10 @@ export async function POST(request: NextRequest) {
 
       if (!user) {
         console.error('❌ User not found in database');
-        return NextResponse.redirect(
-          new URL('/login?error=user_not_found', request.url),
-          { status: 303 }
-        );
+        const redirectUrl = process.env.NODE_ENV === 'production'
+          ? 'https://report.aflahdev.me/login?error=user_not_found'
+          : new URL('/login?error=user_not_found', request.url).toString();
+        return NextResponse.redirect(redirectUrl, { status: 303 });
       }
 
       // Get user's role in the system
@@ -333,21 +333,26 @@ export async function POST(request: NextRequest) {
       console.log(`🔄 Redirecting to: ${redirectPath}`);
       console.log('========================================\n');
 
-      return NextResponse.redirect(new URL(redirectPath, request.url), { status: 303 });
+      // Use absolute URL to ensure correct domain in production
+      const redirectUrl = process.env.NODE_ENV === 'production' 
+        ? `https://report.aflahdev.me${redirectPath}`
+        : new URL(redirectPath, request.url).toString();
+      
+      return NextResponse.redirect(redirectUrl, { status: 303 });
 
     } catch (dbError) {
       console.error('❌ Database error:', dbError);
-      return NextResponse.redirect(
-        new URL('/login?error=database_error', request.url),
-        { status: 303 }
-      );
+      const redirectUrl = process.env.NODE_ENV === 'production'
+        ? 'https://report.aflahdev.me/login?error=database_error'
+        : new URL('/login?error=database_error', request.url).toString();
+      return NextResponse.redirect(redirectUrl, { status: 303 });
     }
 
   } catch (error) {
     console.error('\n❌ LTI Launch Error:', error);
-    return NextResponse.redirect(
-      new URL('/login?error=lti_launch_failed', request.url),
-      { status: 303 }
-    );
+    const redirectUrl = process.env.NODE_ENV === 'production'
+      ? 'https://report.aflahdev.me/login?error=lti_launch_failed'
+      : new URL('/login?error=lti_launch_failed', request.url).toString();
+    return NextResponse.redirect(redirectUrl, { status: 303 });
   }
 }
