@@ -299,8 +299,6 @@ export async function getCompleteAttendanceData(
   dateto?: number
 ) {
   try {
-    console.time('getCompleteAttendanceData');
-    
     // First, get attendance activities for this course
     const activities = await prisma.mdl_attendance.findMany({
       where: {
@@ -316,7 +314,6 @@ export async function getCompleteAttendanceData(
     });
 
     if (activities.length === 0) {
-      console.timeEnd('getCompleteAttendanceData');
       return {
         activities: [],
         sessions: [],
@@ -467,8 +464,6 @@ export async function getCompleteAttendanceData(
         remarks: log.remarks,
       })),
     }));
-
-    console.timeEnd('getCompleteAttendanceData');
 
     return {
       activities: activities.map(activity => ({

@@ -20,10 +20,11 @@ export const sessionOptions: SessionOptions = {
   cookieName: 'lti-session',
   cookieOptions: {
     // For LTI to work across domains, we need secure cookies
-    secure: true, // Requires HTTPS
+    // In production (HTTPS) use secure:true, in development (HTTP) use false
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 60 * 60 * 24 * 7, // 7 days
-    sameSite: 'none', // Required for cross-domain LTI
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     path: '/',
   },
 };

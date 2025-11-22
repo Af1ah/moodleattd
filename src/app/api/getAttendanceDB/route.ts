@@ -35,13 +35,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🎯 Getting attendance data from database for course ${courseId}...`);
-    if (filterStudentId) {
-      console.log(`🔍 Filtering for student ID: ${filterStudentId}`);
-    }
-    if (datefrom || dateto) {
-      console.log(`📅 Date range: ${datefrom ? new Date(datefrom * 1000).toISOString() : 'any'} to ${dateto ? new Date(dateto * 1000).toISOString() : 'any'}`);
-    }
+    // Logs removed - data fetching is fast enough without timing
 
     // Fetch data from database
     const attendanceData = await getCompleteAttendanceData(
@@ -51,9 +45,7 @@ export async function POST(request: NextRequest) {
       dateto
     );
 
-    console.log(`✅ Found ${attendanceData.activities.length} attendance activities`);
-    console.log(`✅ Found ${attendanceData.sessions.length} sessions`);
-    console.log(`✅ Found ${attendanceData.students.length} students`);
+    // Data fetched successfully - logs removed for cleaner output
 
     // Transform database data to match getAttendanceDirect format
     // This ensures the frontend can use the same transformation logic
